@@ -1,4 +1,4 @@
-// Suites de conformité (specs/harness.md, Découpage en dossiers du monorepo) : ce que tout
+// Suites de conformité : ce que tout
 // `Store`, tout transport et tout adaptateur de modèle doit tenir. Chaque suite reçoit une
 // fabrique qui donne une instance neuve : les implémentations du dépôt les lancent dans les tests
 // de ce paquet, une application les lance dans les siens pour ses propres implémentations.

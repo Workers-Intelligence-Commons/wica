@@ -1,4 +1,4 @@
-// Compaction (specs/harness.md, Le cœur et Journal de conversation) : un événement `compacted`
+// Compaction : un événement `compacted`
 // remplace une plage dans la vue d'un chemin, sans rien supprimer du journal. La vue compactée,
 // sa taille et la plage à résumer se déduisent du chemin seul.
 

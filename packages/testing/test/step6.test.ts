@@ -1,4 +1,4 @@
-// Porte de l'étape 6 (specs/harness.md, Livraison par étapes) : tours sans état avec les
+// Porte de l'étape 6 : tours sans état avec les
 // versions en mémoire de `Store`, `Scheduler`, `SessionStore` et `CredentialStore`. Deux
 // processus du serveur partagent un même `Store`, comme deux invocations serverless.
 

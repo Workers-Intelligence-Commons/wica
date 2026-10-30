@@ -1,4 +1,4 @@
-// Graphe des paquets défini dans specs/harness.md (Découpage en dossiers du monorepo).
+// Graphe des paquets : chaque paquet ne dépend que de ceux de sa liste.
 const allowed = {
   core: [],
   codecs: ['core'],

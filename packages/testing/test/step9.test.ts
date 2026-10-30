@@ -1,4 +1,4 @@
-// Porte de l'étape 9 (specs/harness.md, Livraison par étapes) : un agent se réveille seul, traite
+// Porte de l'étape 9 : un agent se réveille seul, traite
 // un événement externe non fiable sans lancer d'outil destructif, demande une approbation à
 // l'approbateur désigné et abandonne au délai. Le faux canal en mémoire : deux clients du
 // protocole, l'interface web et le téléphone de la personne.

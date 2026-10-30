@@ -1,5 +1,5 @@
 // Adaptateur de modèle pour les fournisseurs hébergés, au-dessus de la bibliothèque pi-ai et
-// d'elle seule (specs/harness.md, Adaptateur de modèle et format de chat). Le rendu du chemin vient
+// d'elle seule. Le rendu du chemin vient
 // de `codecs` ; ce paquet le traduit en messages de pi-ai, et le flux de pi-ai en `Delta`.
 
 import type {

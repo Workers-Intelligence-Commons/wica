@@ -6,8 +6,7 @@ export default defineConfig({
     plugins: ['typescript'],
     options: { typeAware: true, typeCheck: true },
   },
-  // Les specs restent la copie fidèle des pages Notion : le formateur ne les réécrit pas.
-  fmt: { singleQuote: true, semi: false, ignorePatterns: ['specs/**'] },
+  fmt: { singleQuote: true, semi: false },
   test: {
     include: ['packages/*/test/**/*.test.ts', 'apps/*/test/**/*.test.ts'],
   },

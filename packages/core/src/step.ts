@@ -1,4 +1,4 @@
-// Machine à états du cœur (specs/harness.md, Le cœur : machine à états sans I/O).
+// Machine à états du cœur.
 
 import {
   actedElsewhere,

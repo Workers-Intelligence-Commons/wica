@@ -1,5 +1,4 @@
-// Rendu du chemin actif commun à tous les formats d'API (specs/harness.md, Journal de conversation
-// et Agents autonomes) : ce que le modèle lit, dans l'ordre, sans la forme d'un fournisseur.
+// Rendu du chemin actif commun à tous les formats d'API : ce que le modèle lit, dans l'ordre, sans la forme d'un fournisseur.
 // Chaque codec traduit ces entrées dans son format et garde pour lui le tri des données opaques.
 
 import { compactPath, HARNESS_TOOLS, type Item, type ModelRequest, type Part } from '@wica/core'

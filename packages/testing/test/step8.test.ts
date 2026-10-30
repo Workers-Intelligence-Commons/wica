@@ -1,4 +1,4 @@
-// Porte de l'étape 8 (specs/harness.md, Livraison par étapes) : une session ACP pilote le même
+// Porte de l'étape 8 : une session ACP pilote le même
 // cœur que le web et le CLI. L'éditeur est simulé dans le processus par le SDK ACP : il fournit
 // ses fichiers comme outils, répond à l'approbation, et un client web voit la même conversation.
 

@@ -1,4 +1,4 @@
-// Contrôle des licences de production de chaque paquet contre le tableau de specs/README.md.
+// Contrôle des licences de production de chaque paquet contre la liste `allowed` ci-dessous.
 // license-checker ne suit pas les espaces de travail depuis la racine : il est lancé par paquet.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'

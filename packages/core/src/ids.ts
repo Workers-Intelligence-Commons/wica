@@ -1,4 +1,4 @@
-// Identifiants déterministes des éléments (specs/harness.md, Journal de conversation).
+// Identifiants déterministes des éléments.
 // Le client et le serveur exécutent ce même code : un écart d'un seul octet dans la
 // sérialisation donnerait deux identifiants différents pour le même message.
 

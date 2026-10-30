@@ -1,4 +1,4 @@
-// Connexions MCP (specs/harness.md, Skills et MCP) : le paquet initialise la connexion à chaque
+// Connexions MCP : le paquet initialise la connexion à chaque
 // serveur configuré par l'hôte, négocie la version, expose ses outils comme des `Tool`, se
 // reconnecte après une coupure et ne laisse jamais une connexion cassée faire échouer un tour.
 // Ce fichier n'utilise que des API web standard ; le lancement de serveurs locaux est dans `./node`.

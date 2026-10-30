@@ -1,4 +1,4 @@
-// Skills au format ouvert Agent Skills (specs/harness.md, Skills et MCP). L'hôte fournit les
+// Skills au format ouvert Agent Skills. L'hôte fournit les
 // emplacements et une fonction de lecture ; ce paquet analyse les `SKILL.md`, rédige la liste
 // donnée au modèle (nom et description seulement) et fournit l'outil qui charge un skill quand la
 // tâche y correspond. Il ne touche pas au système de fichiers lui-même.

@@ -1,4 +1,4 @@
-// Format du journal de conversation, défini dans specs/harness.md (Journal de conversation).
+// Format du journal de conversation.
 
 export type Trust = 'owner' | 'known' | 'untrusted'
 

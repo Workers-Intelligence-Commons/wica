@@ -1,5 +1,4 @@
-// Interfaces fournies par l'hôte pour l'exécution sans état (specs/harness.md, Exécution sans
-// état et sessions), avec leurs versions en mémoire : `Scheduler` réveille une conversation,
+// Interfaces fournies par l'hôte pour l'exécution sans état, avec leurs versions en mémoire : `Scheduler` réveille une conversation,
 // `SessionStore` garde ce qu'il serait coûteux de renégocier, `CredentialStore` garde les jetons
 // et les rafraîchit sous exclusion mutuelle.
 

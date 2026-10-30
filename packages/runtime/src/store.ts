@@ -1,4 +1,4 @@
-// Interface de persistance du journal (specs/harness.md, Exécution sans état et sessions)
+// Interface de persistance du journal
 // et sa version en mémoire, qui sert aux tests et au serveur sans persistance.
 
 import type { Item, ItemDraft } from '@wica/core'

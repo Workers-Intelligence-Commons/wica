@@ -1,4 +1,4 @@
-// Porte de l'étape 3 (specs/harness.md, Livraison par étapes) : une tâche à plusieurs outils
+// Porte de l'étape 3 : une tâche à plusieurs outils
 // menée par le Harness à travers `model-compat` et `codecs`, devant un faux service Open Responses
 // qui rejoue un scénario ; la réponse de la personne est rendue en Open Responses.
 

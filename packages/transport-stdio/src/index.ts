@@ -1,4 +1,4 @@
-// Transport stdio (specs/harness.md, Transports et accès) : des trames JSON, une par ligne, sur
+// Transport stdio : des trames JSON, une par ligne, sur
 // les flux d'un processus local. Le serveur lit stdin et écrit stdout ; le client lance le
 // serveur comme processus enfant.
 

@@ -1,4 +1,4 @@
-// Porte de l'étape 5 (specs/harness.md, Livraison par étapes) : un serveur MCP configuré par
+// Porte de l'étape 5 : un serveur MCP configuré par
 // l'hôte se connecte, expose ses outils et se reconnecte après une coupure ; `authorize` voit
 // les annotations ; une demande d'information du serveur passe par la personne ; un skill fourni
 // par l'hôte se charge à la demande. Le serveur MCP est celui du SDK officiel, relié en mémoire.

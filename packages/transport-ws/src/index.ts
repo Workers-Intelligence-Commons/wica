@@ -1,4 +1,4 @@
-// Transport WebSocket JSON (specs/harness.md, Transports et accès). Ce fichier n'utilise que
+// Transport WebSocket JSON. Ce fichier n'utilise que
 // l'API WebSocket standard : il sert côté serveur sur toute plateforme qui fournit un socket
 // (Workers compris) et côté client. Le serveur Node est dans `./node`.
 

@@ -1,4 +1,4 @@
-// Transport à stockage intermédiaire (specs/harness.md, Transports et accès) : l'hôte dépose
+// Transport à stockage intermédiaire : l'hôte dépose
 // les commandes dans une `CommandInbox`, que le serveur suit par une connexion sortante ; il
 // traverse donc un routeur sans rien d'entrant. Le serveur écrit ses éléments par le `Store` de
 // l'hôte, et les clients les lisent par la synchro de l'hôte : ce transport ne porte que les

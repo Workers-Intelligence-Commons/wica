@@ -1,4 +1,4 @@
-// Adaptateur ACP (specs/harness.md, Protocole client) : un éditeur pilote le Harness par
+// Adaptateur ACP : un éditeur pilote le Harness par
 // l'Agent Client Protocol. L'adaptateur est un client du protocole Wica, comme le web et la
 // ligne de commande : il envoie les messages de l'éditeur, lui rend le flux de la conversation,
 // lui pose les questions et les approbations, et exécute pour le serveur les outils que l'éditeur

@@ -1,4 +1,4 @@
-// Outils et autorisation (specs/harness.md, Outils ; Boucle et autorisation).
+// Outils et autorisation.
 
 import {
   CANCEL_WAKEUP_TOOL,

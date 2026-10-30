@@ -1,4 +1,4 @@
-// Porte de l'étape 2 (specs/harness.md, Livraison par étapes) : topologie tout-local, un seul
+// Porte de l'étape 2 : topologie tout-local, un seul
 // processus ; un agent mène une tâche sur des fichiers de bout en bout, avec approbations.
 
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'

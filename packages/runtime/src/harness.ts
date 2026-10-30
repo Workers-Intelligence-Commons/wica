@@ -1,4 +1,4 @@
-// Le serveur (specs/harness.md, Boucle et autorisation) : la boucle qui interprète les
+// Le serveur : la boucle qui interprète les
 // intentions, l'exécution des outils et les appels au modèle, avec les callbacks de l'hôte.
 
 import {

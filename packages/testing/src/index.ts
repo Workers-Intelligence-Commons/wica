@@ -1,4 +1,4 @@
-// Faux modèle et faux outils pour les tests (specs/harness.md, Découpage en dossiers).
+// Faux modèle et faux outils pour les tests.
 
 import type { AssistantMessage, Item, ModelRequest } from '@wica/core'
 import type { ModelAdapter, ModelChunk, Tool } from '@wica/runtime'

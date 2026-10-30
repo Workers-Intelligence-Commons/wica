@@ -1,6 +1,5 @@
 // Un tour : réclamer la conversation, reconstruire l'état depuis le journal, passer les
-// événements reçus à `step`, exécuter les intentions, écrire, puis continuer ou s'arrêter
-// (specs/harness.md, Exécution sans état et sessions).
+// événements reçus à `step`, exécuter les intentions, écrire, puis continuer ou s'arrêter.
 
 import {
   type AssistantMessage,

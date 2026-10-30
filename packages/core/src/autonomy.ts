@@ -1,4 +1,4 @@
-// Agents autonomes (specs/harness.md, Agents autonomes et canaux, et Journal de conversation) :
+// Agents autonomes :
 // réveils, garde-fous sans humain et reprise d'une ancienne branche. Tout se décide depuis le
 // journal et l'heure reçue par l'événement : un tour sans état prend la même décision qu'un
 // serveur qui garde l'état en mémoire.

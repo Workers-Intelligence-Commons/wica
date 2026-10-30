@@ -1,5 +1,5 @@
-// Adaptateur de modèle pour un service Open Responses, wic-serving en premier
-// (specs/harness.md, Adaptateur de modèle et format de chat). La conversion vient de `codecs` ;
+// Adaptateur de modèle pour un service Open Responses, wic-serving en premier.
+// La conversion vient de `codecs` ;
 // ce paquet ne fait que le réseau : requête, réessais avant le flux, lecture du flux, annulation.
 
 import {

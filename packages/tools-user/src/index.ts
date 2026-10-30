@@ -1,5 +1,4 @@
-// Outils du canal utilisateur (specs/harness.md, Paroles de la personne dans les résultats
-// d'outils) : `ask_user` pose une question que le client affiche, `say` parle à la personne.
+// Outils du canal utilisateur : `ask_user` pose une question que le client affiche, `say` parle à la personne.
 // Les déclarations sont pures ; seul `say` a une fonction, qui accuse réception.
 
 import { ELICIT_TOOL, type Item, type Part, type ToolSpec } from '@wica/core'

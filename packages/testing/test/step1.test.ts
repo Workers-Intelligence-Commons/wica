@@ -1,4 +1,4 @@
-// Porte de l'étape 1 (specs/harness.md, Livraison par étapes) : un tour qui reconstruit son
+// Porte de l'étape 1 : un tour qui reconstruit son
 // état depuis le journal donne le même résultat qu'un serveur qui le garde en mémoire.
 
 import { journalViolations, type Item, type ItemDraft } from '@wica/core'

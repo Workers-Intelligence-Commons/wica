@@ -1,4 +1,4 @@
-// Liaison React du client (specs/harness.md, Découpage en dossiers du monorepo) : la vue d'une
+// Liaison React du client : la vue d'une
 // conversation comme état React, et ses commandes. Ni synchro ni rendu propres : tout vient de
 // `@wica/client`, que l'application crée avec son transport.
 

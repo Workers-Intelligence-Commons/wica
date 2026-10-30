@@ -1,4 +1,4 @@
-// Porte de l'étape 4 (specs/harness.md, Livraison par étapes) : coupure du transport et reprise
+// Porte de l'étape 4 : coupure du transport et reprise
 // depuis un `seq` sans doublon, rejeu d'une commande par identifiant, sur un vrai WebSocket.
 
 import { type Client, createClient, deriveView } from '@wica/client'

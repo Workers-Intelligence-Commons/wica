@@ -1,4 +1,4 @@
-// Protocole client (specs/harness.md, Protocole client) : le client lit un flux reprenable
+// Protocole client : le client lit un flux reprenable
 // d'éléments et envoie des commandes, et le serveur répond.
 
 import type { Item, Part } from '@wica/core'

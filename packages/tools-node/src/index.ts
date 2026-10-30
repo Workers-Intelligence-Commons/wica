@@ -1,4 +1,4 @@
-// Outils de fichiers et de shell (specs/harness.md, Découpage en dossiers ; Architecture).
+// Outils de fichiers et de shell.
 // Le gardien des accès fait respecter les dossiers racines indépendamment de `authorize`.
 
 import { spawn } from 'node:child_process'

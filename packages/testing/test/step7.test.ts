@@ -1,4 +1,4 @@
-// Porte de l'étape 7 (specs/harness.md, Livraison par étapes) : un serveur distant suit la boîte
+// Porte de l'étape 7 : un serveur distant suit la boîte
 // de commandes de l'hôte par une connexion sortante et écrit par le `Store` de l'hôte. Une
 // coupure en plein outil laisse l'outil se terminer ; le résultat est écrit au retour du réseau,
 // et le client reprend depuis son dernier `seq` sans doublon.

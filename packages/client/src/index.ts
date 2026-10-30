@@ -1,4 +1,4 @@
-// Client du protocole (specs/harness.md, Protocole client) : miroir local du journal, envoi des
+// Client du protocole : miroir local du journal, envoi des
 // commandes et vue dérivée pour l'écran. Le miroir rattrape le serveur, il ne fait jamais foi.
 // Ce paquet ne dépend d'aucune bibliothèque de synchronisation, de stockage ou de rendu.
 

@@ -1,4 +1,4 @@
-// Compaction de bout en bout (specs/harness.md, Le cœur) : le serveur demande un résumé au modèle
+// Compaction de bout en bout : le serveur demande un résumé au modèle
 // quand la vue dépasse le seuil, l'écrit en événement `compacted`, puis répond sur la vue résumée.
 
 import { compactPath, journalViolations } from '@wica/core'
