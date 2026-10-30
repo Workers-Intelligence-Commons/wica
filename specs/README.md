@@ -20,7 +20,7 @@ Tout le code de Wica est publié sous AGPL-3.0-or-later (AGPL 3.0 ou toute versi
 
 | Licence d'une dépendance | Statut | Remarque |
 | --- | --- | --- |
-| MIT, BSD, ISC | Acceptée | Compatibles avec l'AGPL 3.0 |
+| MIT, BSD, ISC, Unlicense | Acceptée | Compatibles avec l'AGPL 3.0 |
 | Apache-2.0 | Acceptée | Compatible avec la famille GPL 3, incompatible avec la GPL 2 seule |
 | MPL-2.0 | Acceptée avec précaution | Les fichiers sous MPL restent sous MPL : les garder séparés |
 | LGPL-3.0, GPL-3.0-or-later, AGPL-3.0-or-later | Acceptée | Copyleft compatible, la GPL 3 se combine avec l'AGPL 3 |
@@ -34,6 +34,7 @@ Règles :
 - Les composants lancés comme services séparés (Postgres, Electric, Better Auth, Ory Polis) ne sont pas liés au code de Wica ; par cohérence avec l'auto-hébergement, la même exigence de licence libre s'applique (hypothèse).
 - Un outil de contrôle des licences tourne en CI et bloque l'ajout d'une dépendance hors de la liste (outil à choisir).
 - Chaque paquet déclare sa licence (champ `license` du `package.json` et fichier LICENSE).
+- Le contrôle porte sur les dépendances de production, celles qui sont livrées avec les paquets. Les outils de développement, jamais livrés avec le code de Wica, n'y sont pas soumis (décision du projet).
 
 Source consultée : [tableau de compatibilité de FOSSA](https://fossa.com/resources/devops-tools/license-compatibility-checker/) (outil tiers).
 
@@ -42,7 +43,7 @@ Source consultée : [tableau de compatibilité de FOSSA](https://fossa.com/resou
 | Dossier | Rôle | Spécification |
 | --- | --- | --- |
 | `packages/` | Logique partagée ou destinée à être publiée, en petits modules. Aujourd'hui : le Harness (`core`, `codecs`, `protocol`, `runtime`, `transport-memory`, `transport-stdio`, `transport-ws`, `transport-inbox`, `tools-node`, `tools-user`, `model-compat`, `model-pi`, `mcp`, `skills`, `client`, `client-react`, `testing`) | [Specs du Harness](harness.md) |
-| `apps/` | Applications. Aujourd'hui : `apps/chat`, l'interface de chat (application TanStack Start, implémentation Postgres du `Store`, synchro Electric, identité, rendu et déploiement) | [Specs du chat : application construite sur le Harness](chat.md) |
+| `apps/` | Applications. Aujourd'hui : `apps/local`, le binaire local autonome (commande `wica` : serveur du Harness et client en ligne de commande, par stdio ou WebSocket, et agent ACP pour les éditeurs avec `wica acp`) ; `apps/chat`, l'interface de chat (application TanStack Start, implémentation Postgres du `Store`, synchro Electric, identité, rendu et déploiement) | [Specs du chat : application construite sur le Harness](chat.md) |
 
 Règles :
 
@@ -51,7 +52,7 @@ Règles :
 
 ## État
 
-Spécifications rédigées le 2026-10-30, aucun code écrit. Les points ouverts sont listés à la fin de chaque page de specs.
+Le Harness est écrit (les paquets de `packages/`) avec le binaire local `apps/local`. `apps/chat` n'est pas encore écrit. Les points ouverts sont listés à la fin de chaque page de specs.
 
 ## Sous-pages
 

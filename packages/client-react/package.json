@@ -1,0 +1,23 @@
+{
+  "name": "@wica/client-react",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@wica/client": "workspace:*",
+    "@wica/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/react": "19.3.0",
+    "react": "19.3.1",
+    "vite-plus": "1.4.0"
+  },
+  "peerDependencies": {
+    "react": "^19"
+  }
+}

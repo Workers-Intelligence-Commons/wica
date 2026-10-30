@@ -1,0 +1,28 @@
+{
+  "name": "wica",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "type": "module",
+  "scripts": {
+    "boundaries": "depcruise packages $(test -d apps && echo apps) --config .dependency-cruiser.cjs",
+    "licenses": "node scripts/check-licenses.mjs",
+    "ready": "vp check && vp test && bun run boundaries && bun run licenses"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "^18.7.0",
+    "license-checker-rseidelsohn": "^5.0.1",
+    "typescript": "^6",
+    "vite-plus": "1.4.0"
+  },
+  "overrides": {
+    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
+    "vitest": "5.0.5"
+  },
+  "engines": {
+    "node": ">=22.18.0"
+  }
+}

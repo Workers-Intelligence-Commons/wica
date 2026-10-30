@@ -1,0 +1,21 @@
+{
+  "name": "@wica/mcp",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./node": "./src/node.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/client": "2.4.0",
+    "@wica/core": "workspace:*",
+    "@wica/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
+    "@types/node": "^26.6.6",
+    "vite-plus": "1.4.0"
+  }
+}

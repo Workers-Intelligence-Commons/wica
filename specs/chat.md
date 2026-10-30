@@ -27,7 +27,7 @@ Identité : l'application ne connaît que des comptes, des organisations et des 
 | Serveur distant | `CommandInbox`, paquet `transport-inbox` | Shape Electric sur `commands`, API HTTP du `Store` |
 | Lecture côté interface | Paquet `client` (vue dérivée du journal) et protocole client | Transport Electric, collections TanStack DB, cache local |
 | Exécution des outils | `runtime` et `tools-node`, dans le serveur | Serveur embarqué sans outils système ; outils système par un serveur distant via la boîte de commandes, jeton par serveur |
-| Modèle | `model-compat` | Appel du service de modèle (GPU) ; fournisseurs hébergés par `model-pi`, clés d'API et abonnements (jeton chiffré par compte, avertissement unique à la première connexion) |
+| Modèle | `model-compat` | Appel de wic-serving en Open Responses, devant le service de modèle (GPU) ; fournisseurs hébergés par `model-pi`, clés d'API et abonnements (jeton chiffré par compte, avertissement unique à la première connexion) |
 
 ## Architecture
 
@@ -38,7 +38,7 @@ flowchart TD
   N["Navigateur<br/>client du Harness + TanStack DB<br/>Cache local persistant"] -->|"commandes (POST)"| A
   A -->|"shapes via le proxy"| N
   A["Application (TanStack Start)<br/>Serveur du Harness (runtime) + Store Postgres<br/>Proxy de shapes et identité"]
-  A -->|"requête"| G["Service de modèle (GPU)<br/>model-compat"]
+  A -->|"requête Open Responses (model-compat)"| G["wic-serving<br/>puis service de modèle (GPU)"]
   G -->|"deltas"| A
   A <-->|"protocole client, par boîte de commandes"| ENV["Serveur distant<br/>machine de la personne ou bac à sable cloud"]
   A -->|"écrit éléments et chunks"| P[("Postgres (source de vérité)<br/>Base chat : éléments et chunks<br/>Base auth : comptes et sessions")]
@@ -50,7 +50,7 @@ flowchart TD
 - Electric : lit le journal de transactions de Postgres et diffuse des shapes en HTTP ; il ne reçoit jamais d'écriture.
 - Application (TanStack Start) : embarque le serveur du Harness, résout le `Principal` par adaptateur d'identité, expose l'API de commandes (`send`, `answer`, `interrupt`, `set_head`), proxy des shapes, rendu serveur en flux.
 - Client (paquet `client` du Harness et TanStack DB) : collections synchronisées, requêtes live, cache local persistant.
-- Service de modèle (GPU) : produit les tokens, appelé par l'adaptateur de modèle du serveur, uniquement depuis l'application.
+- Service de modèle (GPU) : produit les tokens, appelé à travers wic-serving par l'adaptateur de modèle du serveur, uniquement depuis l'application.
 - Serveur distant (machine de la personne ou bac à sable cloud) : un serveur du Harness avec accès au système, qui suit la boîte de commandes du chat et y écrit par le Store en HTTP. Le serveur embarqué, lui, n'exécute pas d'outils système.
 - Service d'auth (optionnel, hors schéma) : Better Auth, OIDC et OAuth 2.1, dans le déploiement de référence. L'application ne le voit que comme un fournisseur OIDC.
 

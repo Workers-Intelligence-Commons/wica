@@ -1,0 +1,21 @@
+{
+  "name": "@wica/model-pi",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "1.4.0",
+    "@wica/codecs": "workspace:*",
+    "@wica/core": "workspace:*",
+    "@wica/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@wica/testing": "workspace:*",
+    "vite-plus": "1.4.0"
+  }
+}

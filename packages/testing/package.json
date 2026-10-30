@@ -1,0 +1,34 @@
+{
+  "name": "@wica/testing",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@wica/acp": "workspace:*",
+    "@wica/client": "workspace:*",
+    "@wica/codecs": "workspace:*",
+    "@wica/core": "workspace:*",
+    "@wica/mcp": "workspace:*",
+    "@wica/model-compat": "workspace:*",
+    "@wica/protocol": "workspace:*",
+    "@wica/runtime": "workspace:*",
+    "@wica/skills": "workspace:*",
+    "@wica/tools-node": "workspace:*",
+    "@wica/tools-user": "workspace:*",
+    "@wica/transport-inbox": "workspace:*",
+    "@wica/transport-memory": "workspace:*",
+    "@wica/transport-stdio": "workspace:*",
+    "@wica/transport-ws": "workspace:*"
+  },
+  "devDependencies": {
+    "@agentclientprotocol/sdk": "2.2.0",
+    "@modelcontextprotocol/server": "2.4.0",
+    "@types/node": "^26.6.6",
+    "vite-plus": "1.4.0",
+    "zod": "4.6.7"
+  }
+}
