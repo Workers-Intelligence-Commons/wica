@@ -1,9 +1,9 @@
-# Déploiement auto-hébergé du chat : Postgres, Electric, l'application et Caddy, sans service
-# externe. Les valeurs viennent de `.env` (voir `.env.example`). Le script de `initdb` ne s'exécute
-# que sur un volume de données vide.
+# Self-hosted deployment of the chat: Postgres, Electric, the application and Caddy, with no
+# external service. Values come from `.env` (see `.env.example`). The `initdb` script runs only
+# on an empty data volume.
 #
-# Seul Caddy est publié, en HTTPS : l'application ne se joint pas en `http://` direct, où le
-# navigateur limiterait ses connexions et refuserait les cookies de session.
+# Only Caddy is published, over HTTPS: the application is not reached over direct `http://`, where
+# the browser would limit its connections and refuse the session cookies.
 
 services:
   db:
@@ -12,7 +12,7 @@ services:
       - postgres
       - -c
       - wal_level=logical
-      # Un slot de réplication abandonné ne retient pas plus que ce volume de journal.
+      # An abandoned replication slot retains no more than this much journal.
       - -c
       - max_slot_wal_keep_size=4GB
     environment:
@@ -33,7 +33,7 @@ services:
     environment:
       DATABASE_URL: postgresql://electric:${ELECTRIC_DB_PASSWORD}@db:5432/chat?sslmode=disable
       ELECTRIC_SECRET: ${ELECTRIC_SECRET:?}
-      # La publication et ses tables sont créées par le schéma ; le rôle d'Electric n'en possède aucune.
+      # The publication and its tables are created by the schema; Electric's role owns none of them.
       ELECTRIC_MANUAL_TABLE_PUBLISHING: 'true'
       ELECTRIC_STORAGE_DIR: /var/lib/electric/persistent
     volumes:
@@ -51,7 +51,7 @@ services:
     environment:
       DATABASE_URL: postgresql://chat_app:${CHAT_DB_PASSWORD}@db:5432/chat?sslmode=disable
       ELECTRIC_URL: http://electric:3000
-      # Seul Caddy joint l'application : l'adresse du client est celle qu'il transmet.
+      # Only Caddy reaches the application: the client address is the one it forwards.
       WICA_BEHIND_CADDY: '1'
     depends_on:
       db:
@@ -79,6 +79,6 @@ services:
 volumes:
   db_data:
   electric_data:
-  # Certificats et clé de l'autorité locale de Caddy.
+  # Certificates and key of Caddy's local authority.
   caddy_data:
   caddy_config:

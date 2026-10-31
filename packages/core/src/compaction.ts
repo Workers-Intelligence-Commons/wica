@@ -1,12 +1,12 @@
-// Compaction : un événement `compacted`
-// remplace une plage dans la vue d'un chemin, sans rien supprimer du journal. La vue compactée,
-// sa taille et la plage à résumer se déduisent du chemin seul.
+// Compaction: a `compacted` event replaces a range in the view of a path, without deleting
+// anything from the journal. The compacted view, its size and the range to summarize are derived
+// from the path alone.
 
 import type { ItemDraft } from './journal.ts'
 
-/** Seuil de compaction réglé par l'hôte. Absent : aucune compaction. */
+/** Compaction threshold set by the host. Absent: no compaction. */
 export type CompactionPolicy = {
-  /** Taille de la vue du modèle, en caractères, au-delà de laquelle le passé est résumé. */
+  /** Size of the model view, in characters, beyond which the past is summarized. */
   maxChars: number
 }
 
@@ -18,8 +18,8 @@ const compacted = (i: ItemDraft): Compacted | undefined =>
   i.kind === 'event' && i.name === 'compacted' ? (i.data as Compacted) : undefined
 
 /**
- * Remplace les plages résumées par un événement `compacted` du chemin : `data.from` et `data.to`
- * bornent la plage, `data.summary` la remplace. Rien n'est supprimé du journal.
+ * Replaces the summarized ranges with a `compacted` event of the path: `data.from` and `data.to`
+ * bound the range, `data.summary` replaces it. Nothing is deleted from the journal.
  */
 export function compactPath<T extends ItemDraft>(path: readonly T[]): (T | Summary)[] {
   const last = path.findLast((i) => compacted(i) !== undefined)
@@ -35,7 +35,7 @@ export function compactPath<T extends ItemDraft>(path: readonly T[]): (T | Summa
   ]
 }
 
-/** Taille, en caractères, de ce que le modèle lit d'une vue : textes, entrées et sorties d'outils. */
+/** Size, in characters, of what the model reads from a view: texts, tool inputs and outputs. */
 export function visibleSize(view: readonly (ItemDraft | Summary)[]): number {
   let size = 0
   for (const i of view) {
@@ -56,10 +56,11 @@ const isInput = (i: ItemDraft) =>
   (i.kind === 'event' && i.name === 'wakeup_fired')
 
 /**
- * Plage à résumer avant l'appel au modèle, quand la vue dépasse le seuil : de la racine jusqu'à
- * l'élément qui précède l'échange en cours (la dernière entrée et sa suite). Aucun appel d'outil
- * n'y est séparé de son résultat, et un résumé plus ancien entre dans le nouveau. Une plage déjà
- * résumée ne l'est pas deux fois, même si l'échange en cours dépasse seul le seuil.
+ * Range to summarize before the model call, when the view exceeds the threshold: from the root up
+ * to the item that precedes the current exchange (the last input and what follows it). No tool
+ * call is separated from its result there, and an older summary goes into the new one. A range
+ * already summarized is not summarized twice, even if the current exchange alone exceeds the
+ * threshold.
  */
 export function compactionRange(
   path: readonly ItemDraft[],

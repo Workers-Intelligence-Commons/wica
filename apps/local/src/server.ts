@@ -1,6 +1,6 @@
-// Le serveur du binaire local : Harness, outils du dossier de travail, outils du canal
-// utilisateur et modèle Open Responses configuré par l'environnement, ou un faux modèle de
-// `@wica/testing/lorem` pour essayer sans serveur de modèle.
+// The local binary's server: Harness, working folder tools, user channel tools, and the Open
+// Responses model configured by the environment, or a fake model from `@wica/testing/lorem` for
+// trying without a model server.
 
 import { openResponsesModel } from '@wica/model-compat'
 import {
@@ -15,14 +15,14 @@ import { nodeTools } from '@wica/tools-node'
 import { renderAnswer, userTools } from '@wica/tools-user'
 
 export type LocalConfig = {
-  /** Absente quand `model` est un faux modèle (`lorem`, `lorem-tools`). */
+  /** Absent when `model` is a fake model (`lorem`, `lorem-tools`). */
   modelUrl?: string
   model: string
   apiKey?: string
   effort?: 'none' | 'low' | 'medium' | 'high' | 'xhigh'
-  /** Dossier où les outils agissent. */
+  /** Folder where the tools act. */
   root: string
-  /** Vrai : tout outil est autorisé sans demande. */
+  /** True: every tool is allowed without a request. */
   allowAll: boolean
   auth?: ClientAuth
 }
@@ -33,7 +33,7 @@ export class ConfigError extends Error {
 
 const EFFORTS = ['none', 'low', 'medium', 'high', 'xhigh'] as const
 
-/** Lit la configuration du modèle dans l'environnement. */
+/** Reads the model configuration from the environment. */
 export function configFromEnv(
   env: NodeJS.ProcessEnv,
   rest: Omit<LocalConfig, 'modelUrl' | 'model' | 'apiKey' | 'effort'>,
@@ -42,12 +42,12 @@ export function configFromEnv(
   const model = env.WICA_MODEL
   if (!model || (!modelUrl && !isLoremModel(model))) {
     throw new ConfigError(
-      'WICA_MODEL_URL (adresse du service Open Responses, par exemple http://localhost:8000/v1) et WICA_MODEL (identifiant du modèle) sont requis, sauf pour les faux modèles WICA_MODEL=lorem ou lorem-tools.',
+      'WICA_MODEL_URL (address of the Open Responses service, for example http://localhost:8000/v1) and WICA_MODEL (model identifier) are required, except for the fake models WICA_MODEL=lorem or lorem-tools.',
     )
   }
   const effort = env.WICA_REASONING_EFFORT
   if (effort !== undefined && !(EFFORTS as readonly string[]).includes(effort)) {
-    throw new ConfigError(`WICA_REASONING_EFFORT doit valoir ${EFFORTS.join(', ')}.`)
+    throw new ConfigError(`WICA_REASONING_EFFORT must be ${EFFORTS.join(', ')}.`)
   }
   return {
     ...rest,
@@ -58,14 +58,14 @@ export function configFromEnv(
   }
 }
 
-/** Les lectures passent ; tout le reste demande l'accord de la personne. */
+/** Reads pass; everything else asks for the person's approval. */
 export const askBeforeChanges: Authorize = (call) =>
   call.annotations.readOnlyHint ? 'allow' : { ask: `Allow ${call.tool}?` }
 
-/** Outils, consignes et stockage d'un autre mode que la ligne de commande, comme ACP ou le chat. */
+/** Tools, instructions and storage for a mode other than the command line, like ACP or the chat. */
 export type ServerOverrides = Pick<HarnessOptions, 'tools' | 'instructions' | 'store'>
 
-/** Le service Open Responses quand une adresse est donnée, sinon le faux modèle nommé. */
+/** The Open Responses service when an address is given, otherwise the named fake model. */
 function modelOf(config: LocalConfig) {
   if (config.modelUrl) {
     return openResponsesModel({
@@ -76,7 +76,7 @@ function modelOf(config: LocalConfig) {
     })
   }
   if (isLoremModel(config.model)) return loremModel(config.model)
-  throw new ConfigError(`WICA_MODEL_URL est requis pour le modèle ${config.model}.`)
+  throw new ConfigError(`WICA_MODEL_URL is required for the model ${config.model}.`)
 }
 
 export function createLocalServer(config: LocalConfig, overrides: ServerOverrides = {}): Harness {
@@ -87,7 +87,7 @@ export function createLocalServer(config: LocalConfig, overrides: ServerOverride
     renderAnswer,
     instructions:
       overrides.instructions ??
-      `Tu travailles dans le dossier ${config.root}. Parle à la personne avec l'outil say, et pose tes questions avec ask_user.`,
+      `You work in the folder ${config.root}. Speak to the person with the say tool, and ask your questions with ask_user.`,
     ...(config.auth ? { auth: config.auth } : {}),
     ...(overrides.store ? { store: overrides.store } : {}),
   })

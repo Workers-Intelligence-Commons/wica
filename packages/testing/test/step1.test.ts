@@ -1,5 +1,5 @@
-// Porte de l'étape 1 : un tour qui reconstruit son
-// état depuis le journal donne le même résultat qu'un serveur qui le garde en mémoire.
+// Step 1 gate: a turn that rebuilds its state from the journal gives the same result as a server
+// that keeps it in memory.
 
 import { journalViolations, type Item, type ItemDraft } from '@wica/core'
 import { MemoryStore, runTurn, StaleEpochError, type TurnOptions } from '@wica/runtime'
@@ -7,17 +7,17 @@ import { describe, expect, it } from 'vite-plus/test'
 
 import { lastItem, memoryFiles, scriptedModel } from '../src/index.ts'
 
-// Le modèle lit a.txt, puis répond avec son contenu.
+// The model reads a.txt, then answers with its content.
 const model = () =>
   scriptedModel((request) => {
     const last = lastItem(request)
     if (last?.kind === 'tool_result') {
       const content = last.output[0]?.type === 'text' ? last.output[0].text : ''
-      return { parts: [{ type: 'text', text: `Le fichier dit : ${content}` }] }
+      return { parts: [{ type: 'text', text: `The file says: ${content}` }] }
     }
     return {
       parts: [
-        { type: 'text', text: 'Je lis le fichier.' },
+        { type: 'text', text: 'Reading the file.' },
         { type: 'tool_call', callId: 'k1', tool: 'read_file', input: { path: 'a.txt' } },
       ],
     }
@@ -26,7 +26,7 @@ const model = () =>
 const options = (store: MemoryStore): TurnOptions => ({
   store,
   model: model(),
-  tools: [memoryFiles({ 'a.txt': 'bonjour' })],
+  tools: [memoryFiles({ 'a.txt': 'hello' })],
   conversationId: 'c1',
   now: () => '2026-10-30T00:00:00.000Z',
 })
@@ -34,24 +34,24 @@ const options = (store: MemoryStore): TurnOptions => ({
 const ask: NonNullable<TurnOptions['events']>[number] = {
   t: 'user_message',
   parentId: null,
-  parts: [{ type: 'text', text: 'Lis a.txt' }],
+  parts: [{ type: 'text', text: 'Read a.txt' }],
 }
 const withoutTime = (items: Item[]) => items.map(({ at: _at, ...rest }) => rest)
 
-/** Réclamation par un tour qui s'arrête ensuite sans rien libérer, comme un processus tué. */
+/** Claim by a turn that then stops without releasing anything, like a killed process. */
 async function lostTurn(store: MemoryStore) {
   const claim = await store.claim('c1', 1000)
-  if (!('epoch' in claim)) throw new Error('conversation déjà tenue')
+  if (!('epoch' in claim)) throw new Error('conversation already held')
   return claim.epoch
 }
 
-describe('étape 1', () => {
-  it('donne le même journal avec ou sans état gardé en mémoire, et termine la tâche', async () => {
-    const stateful = new MemoryStore({ salt: () => 'sel' })
+describe('step 1', () => {
+  it('gives the same journal with or without state kept in memory, and finishes the task', async () => {
+    const stateful = new MemoryStore({ salt: () => 'salt' })
     const one = await runTurn({ ...options(stateful), events: [ask] })
     expect(one.done).toBe(true)
 
-    const stateless = new MemoryStore({ salt: () => 'sel' })
+    const stateless = new MemoryStore({ salt: () => 'salt' })
     let result = await runTurn({ ...options(stateless), events: [ask], maxIntents: 1 })
     let turns = 1
     while (!result.done) {
@@ -66,17 +66,17 @@ describe('étape 1', () => {
     expect(journalViolations(a)).toEqual([])
     expect(a.at(-1)).toMatchObject({
       kind: 'assistant_text',
-      text: 'Le fichier dit : bonjour',
+      text: 'The file says: hello',
       audience: 'user',
       status: 'done',
     })
   })
 
-  it("ne relance jamais un outil réclamé par un tour perdu, et lui donne l'erreur d'état inconnu", async () => {
+  it('never restarts a tool claimed by a lost turn, and gives it the unknown state error', async () => {
     let clock = 0
-    const store = new MemoryStore({ salt: () => 'sel', now: () => clock })
+    const store = new MemoryStore({ salt: () => 'salt', now: () => clock })
     let ran = 0
-    const files = memoryFiles({ 'a.txt': 'bonjour' })
+    const files = memoryFiles({ 'a.txt': 'hello' })
     const counting = {
       ...files,
       run: async (...args: Parameters<NonNullable<typeof files.run>>) => {
@@ -84,11 +84,11 @@ describe('étape 1', () => {
         return files.run!(...args)
       },
     }
-    // Premier tour : le modèle demande l'outil, puis le tour s'arrête avant de l'exécuter.
+    // First turn: the model asks for the tool, then the turn stops before running it.
     await runTurn({ ...options(store), tools: [counting], events: [ask], maxIntents: 1 })
-    // Un tour perdu avait réclamé l'outil sans écrire de résultat.
+    // A lost turn had claimed the tool without writing a result.
     await store.claimToolCall('c1', 'k1', await lostTurn(store))
-    // Son bail échoit, et le tour suivant reprend la conversation.
+    // Its lease expires, and the next turn resumes the conversation.
     clock += 1001
 
     const result = await runTurn({ ...options(store), tools: [counting] })
@@ -99,9 +99,9 @@ describe('étape 1', () => {
     expect(journalViolations(items)).toEqual([])
   })
 
-  it("refuse l'écriture d'un tour périmé par une nouvelle réclamation", async () => {
+  it('refuses the write of a turn made stale by a new claim', async () => {
     let clock = 0
-    const store = new MemoryStore({ salt: () => 'sel', now: () => clock })
+    const store = new MemoryStore({ salt: () => 'salt', now: () => clock })
     const old = await lostTurn(store)
     clock += 1001
     await lostTurn(store)

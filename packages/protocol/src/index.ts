@@ -1,5 +1,5 @@
-// Protocole client : le client lit un flux reprenable
-// d'éléments et envoie des commandes, et le serveur répond.
+// Client protocol: the client reads a resumable stream of items and sends commands, and the
+// server answers.
 
 import type { Item, Part } from '@wica/core'
 
@@ -13,13 +13,12 @@ export type Command =
   | { t: 'regenerate'; itemId: string }
 
 /**
- * Valeur d'`answer` pour un outil de l'environnement exécuté par le client (fichiers ou terminal
- * d'un éditeur) : le résultat tel quel, qui reste un résultat d'outil et jamais la parole de la
- * personne.
+ * Value of `answer` for an environment tool run by the client (files or terminal of an editor):
+ * the result as it is, which stays a tool result and never the person's speech.
  */
 export type ClientToolResult = { output: Part[]; isError?: boolean }
 
-/** `commandId` : rejeu sans doublon ; `clientSeq` : ordre des commandes d'un client. */
+/** `commandId`: replay without duplicates; `clientSeq`: order of the commands of a client. */
 export type Envelope = {
   kind: 'command'
   sessionId: string
@@ -29,20 +28,20 @@ export type Envelope = {
   command: Command
 }
 
-/** Lecture reprenable : tout élément dont le `seq` dépasse `fromSeq`, puis le flux en direct. */
+/** Resumable read: every item whose `seq` exceeds `fromSeq`, then the live stream. */
 export type Subscribe = { kind: 'subscribe'; conversationId: string; fromSeq: number }
 
 export type ClientFrame =
-  /** `sessionId` : session à reprendre, sans nouvelle authentification si elle est encore valide. */
+  /** `sessionId`: session to resume, without new authentication if it is still valid. */
   | { kind: 'hello'; version: number; token?: string; sessionId?: string }
   | Subscribe
   | { kind: 'unsubscribe'; conversationId: string }
-  /** Battement de cœur : le serveur répond `pong`, ce qui révèle une connexion morte. */
+  /** Heartbeat: the server answers `pong`, which reveals a dead connection. */
   | { kind: 'ping' }
   | Envelope
 
 export type ServerFrame =
-  /** `resumed` : la session demandée a été reprise ; sinon une nouvelle a été ouverte. */
+  /** `resumed`: the requested session was resumed; otherwise a new one was opened. */
   | { kind: 'welcome'; version: number; sessionId: string; resumed: boolean }
   | { kind: 'items'; conversationId: string; salt: string; items: Item[] }
   | { kind: 'head'; conversationId: string; itemId: string }
@@ -52,14 +51,14 @@ export type ServerFrame =
   | { kind: 'ack'; commandId: string; ok: false; error: string }
   | { kind: 'error'; message: string; conversationId?: string }
   | { kind: 'pong' }
-  /** Un tour tourne pour cette conversation, ou plus aucun. */
+  /** A turn is running for this conversation, or none anymore. */
   | { kind: 'status'; conversationId: string; running: boolean }
 
 export type Frame = ClientFrame | ServerFrame
 
 /**
- * Canal de trames entre un client et un serveur. Livraison au moins une fois, sans garantie
- * d'ordre entre deux connexions : le protocole tient le reste (identifiants, curseurs).
+ * Frame channel between a client and a server. At-least-once delivery, without an ordering
+ * guarantee between two connections: the protocol handles the rest (identifiers, cursors).
  */
 export interface Transport<Out extends Frame = Frame, In extends Frame = Frame> {
   send(frame: Out): Promise<void>
@@ -69,8 +68,8 @@ export interface Transport<Out extends Frame = Frame, In extends Frame = Frame> 
 
 export interface ClientTransport extends Transport<ClientFrame, ServerFrame> {
   /**
-   * Transport qui se reconnecte seul : `listener` est appelé après chaque reconnexion, pour que
-   * le client reprenne (hello, abonnements depuis son curseur, commandes sans accusé).
+   * Transport that reconnects on its own: `listener` is called after each reconnection, so that
+   * the client resumes (hello, subscriptions from its cursor, commands without acknowledgement).
    */
   onReopen?(listener: () => void): () => void
 }

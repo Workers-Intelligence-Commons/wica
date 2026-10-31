@@ -1,5 +1,5 @@
-// Plateforme du Compose : un seul processus Node, un pool Postgres partagé, et la boucle du
-// planificateur, qui lit `wakeups` et lance les tours dans ce processus.
+// Compose platform: a single Node process, a shared Postgres pool, and the scheduler loop, which
+// reads `wakeups` and starts turns in this process.
 
 import postgres from 'postgres'
 
@@ -23,12 +23,12 @@ function shared() {
   return instance
 }
 
-/** Le chat de cette requête : celui du processus. */
+/** The chat of this request: the one of the process. */
 export async function withChat<T>(_req: Request, fn: (chat: ChatServer) => Promise<T>): Promise<T> {
   return fn(shared().chat)
 }
 
-/** Démarre la boucle des réveils ; rend la fonction d'arrêt. */
+/** Starts the wake-up loop; returns the stop function. */
 export function startBackground() {
   const { chat, scheduler } = shared()
   return scheduler.run((conversationId) => chat.wake(conversationId))

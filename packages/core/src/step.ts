@@ -1,4 +1,4 @@
-// Machine à états du cœur.
+// State machine of the core.
 
 import {
   actedElsewhere,
@@ -44,23 +44,23 @@ type EventBody =
   | { t: 'persisted'; items: { id: string; seq: number }[] }
   | { t: 'interrupt' }
   | { t: 'set_head'; itemId: string }
-  /** `to` : l'approbateur désigné de la conversation, à qui la demande s'adresse. */
+  /** `to`: the designated approver of the conversation, to whom the request is addressed. */
   | { t: 'approval_needed'; callId: string; question: string; to?: Destination }
   | { t: 'approval'; callId: string; granted: boolean; from?: Origin }
   | { t: 'external_event'; source: string; name: string; data: unknown; trust: Trust }
-  /** L'appel de l'outil `schedule`, autorisé, prévoit son réveil. */
+  /** The call of the `schedule` tool, allowed, schedules its wake-up. */
   | { t: 'wakeup_scheduled'; callId: string }
-  /** L'appel de l'outil `cancel_wakeup`, autorisé, annule un réveil prévu. */
+  /** The call of the `cancel_wakeup` tool, allowed, cancels a scheduled wake-up. */
   | { t: 'wakeup_cancelled'; callId: string }
-  /** Résumé rendu par le modèle pour une requête `summarize`. */
+  /** Summary returned by the model for a `summarize` request. */
   | { t: 'compacted'; from: string; to: string; summary: string }
   | { t: 'regenerate'; itemId: string; commandId: string }
   | { t: 'tool_question'; callId: string; n: number; input: unknown }
-  /** L'appel, autorisé, est confié au client qui exécute l'outil. */
+  /** The call, allowed, is delegated to the client that runs the tool. */
   | { t: 'tool_handed'; callId: string }
   | { t: 'resume' }
 
-/** Chaque événement porte l'heure fournie par l'hôte : le cœur ne lit jamais l'horloge. */
+/** Each event carries the time provided by the host: the core never reads the clock. */
 export type Event = EventBody & { at: string }
 
 export type Intent =
@@ -69,28 +69,28 @@ export type Intent =
   | { t: 'to_user'; item: ItemDraft }
   | { t: 'ask_user'; question: Question }
   | { t: 'persist'; items: ItemDraft[] }
-  /** Réveiller la conversation à cette heure : réveil prévu, échéance d'une approbation. */
+  /** Wake the conversation at this time: scheduled wake-up, deadline of an approval. */
   | { t: 'schedule'; at: string }
   | { t: 'append_delta'; itemId: string; text: string }
   | { t: 'settle'; item: ItemDraft }
 
 export type Policy = {
-  /** `user_tool` : le texte libre est une pensée privée ; `direct` : il s'affiche (mode chat simple). */
+  /** `user_tool`: free text is a private thought; `direct`: it is shown (simple chat mode). */
   freeText: 'user_tool' | 'direct'
-  /** Délai au-delà duquel une approbation sans réponse vaut refus. Absent : pas d'échéance. */
+  /** Delay beyond which an unanswered approval counts as a refusal. Absent: no deadline. */
   approvalTimeoutMs?: number
-  /** Garde-fous des réveils. */
+  /** Wake-up guardrails. */
   wakeups?: WakeupPolicy
-  /** Résumé du passé quand la vue du modèle devient trop grande. Absent : aucune compaction. */
+  /** Summary of the past when the model view becomes too large. Absent: no compaction. */
   compaction?: CompactionPolicy
 }
 
 type Stream = {
   trigger: string
-  /** Dernier élément produit par cette réponse : parent du suivant. */
+  /** Last item produced by this response: parent of the next one. */
   tip: string | null
   nextRank: number
-  /** Éléments ouverts en flux, dans leur ordre de création. */
+  /** Items open for streaming, in their order of creation. */
   open: { id: string; kind: 'assistant_text' | 'reasoning'; text: string }[]
 }
 
@@ -99,7 +99,7 @@ export type State = {
   conversationId: string
   salt: string
   items: Item[]
-  /** Éléments émis par `persist` et pas encore accusés par le `Store`. */
+  /** Items emitted by `persist` and not yet acknowledged by the `Store`. */
   pending: ItemDraft[]
   maxSeq: number
   head: string | null
@@ -110,7 +110,7 @@ export type State = {
 
 export type Step = { state: State; intents: Intent[] }
 
-/** Liste d'outils du dernier instantané `tools_changed` du chemin affiché. */
+/** Tool list of the last `tools_changed` snapshot of the displayed path. */
 function toolsOnPath(items: (Item | ItemDraft)[], head: string | null): ToolSpec[] | undefined {
   const last = pathTo(items, head).findLast((i) => i.kind === 'event' && i.name === 'tools_changed')
   return last?.kind === 'event' ? (last.data as { tools: ToolSpec[] }).tools : undefined
@@ -153,7 +153,7 @@ function draft(
   return { id, parentId, at, status, ...(meta ? { meta } : {}), ...body } as ItemDraft
 }
 
-/** Remplace un élément (accusé ou non) par sa version réglée. */
+/** Replaces an item (acknowledged or not) with its settled version. */
 function replace(s: State, item: ItemDraft): State {
   const pending = s.pending.map((p) => (p.id === item.id ? item : p))
   const items = s.items.map((i) => (i.id === item.id ? { ...item, seq: i.seq } : i))
@@ -174,11 +174,11 @@ function toolSpec(s: State, name: string): ToolSpec | undefined {
   return s.tools.find((t) => t.name === name)
 }
 
-/** Ferme les éléments encore ouverts en flux avec un statut final. */
+/** Closes the items still open for streaming with a final status. */
 function closeStream(s: State, status: Item['status']): Step {
   const streaming = all(s).filter((i) => i.status === 'streaming')
-  // Une réponse interrompue est celle que la personne a vue s'écrire : son texte lui est adressé
-  // comme à la fin d'une réponse sans appel d'outil, car un appel n'existe qu'à la fin du message.
+  // An interrupted response is the one the person saw being written: its text is addressed to them
+  // as at the end of a response without a tool call, because a call exists only at the end of the message.
   const lastText =
     status === 'interrupted'
       ? streaming.findLast((i) => i.kind === 'assistant_text')?.id
@@ -221,7 +221,7 @@ function openCalls(items: readonly ItemDraft[], head: string | null): ToolCall[]
   )
 }
 
-/** Dernier élément du chemin qui compte pour la reprise, s'il appelle une réponse du modèle. */
+/** Last item of the path that counts for the resume, if it calls for a model response. */
 function answerTrigger(path: readonly ItemDraft[]): ItemDraft | undefined {
   const last = path.findLast(
     (i) =>
@@ -240,9 +240,9 @@ function answerTrigger(path: readonly ItemDraft[]): ItemDraft | undefined {
 }
 
 /**
- * La conversation est au repos d'après son journal : aucun appel du chemin n'attend son
- * résultat, et le dernier élément n'appelle pas de réponse du modèle. La même règle décide si
- * une reprise a du travail ; un client s'en sert pour savoir que le serveur ne doit plus rien.
+ * The conversation is at rest according to its journal: no call of the path waits for its
+ * result, and the last item does not call for a model response. The same rule decides whether a
+ * resume has work; a client uses it to know that the server owes nothing more.
  */
 export function settled(items: readonly ItemDraft[], head: string | null): boolean {
   return openCalls(items, head).length === 0 && !answerTrigger(pathTo(items, head))
@@ -253,7 +253,7 @@ function callItem(s: State, callId: string) {
   return item?.kind === 'tool_call' ? item : undefined
 }
 
-/** L'appel a été confié à son client : il n'attend plus que son résultat. */
+/** The call has been delegated to its client: it now waits only for its result. */
 const handed = (s: State, callId: string) =>
   all(s).some(
     (i) =>
@@ -263,7 +263,7 @@ const handed = (s: State, callId: string) =>
   )
 
 function resume(s: State, at: string): Step {
-  // Un tour ne commence qu'après une réclamation réussie : un flux encore ouvert vient d'un tour perdu.
+  // A turn starts only after a successful claim: a stream still open comes from a lost turn.
   const closed = closeStream(s, 'interrupted')
   const state = closed.state
   const intents = [...closed.intents]
@@ -272,10 +272,9 @@ function resume(s: State, at: string): Step {
   if (calls.length > 0) {
     const answered = results(state)
     for (const call of calls) {
-      // Un outil du canal utilisateur s'exécute chez le client sauf s'il se déclare exécuté par
-      // le serveur (`say`). Un outil de l'environnement exécuté par un client (fichiers d'un
-      // éditeur) passe d'abord par l'autorisation, comme tout outil : `run_tool`, que le serveur
-      // n'exécute pas lui-même.
+      // A user channel tool runs on the client unless it declares itself run by the server
+      // (`say`). An environment tool run by a client (files of an editor) first goes through
+      // authorization, like any tool: `run_tool`, which the server does not run itself.
       const runsOn = toolSpec(state, call.tool)?.runsOn
       if (
         (call.channel === 'user' && runsOn !== 'server') ||
@@ -291,7 +290,7 @@ function resume(s: State, at: string): Step {
       }
       const answer = answered.get(approval.callId)
       if (!answer) {
-        // La personne n'a pas encore répondu : rien ne part, sauf à l'échéance, qui vaut refus.
+        // The person has not answered yet: nothing leaves, except at the deadline, which counts as a refusal.
         const timeout = state.policy.approvalTimeoutMs
         if (timeout === undefined) continue
         const deadline = Date.parse(approval.at) + timeout
@@ -311,7 +310,7 @@ function resume(s: State, at: string): Step {
         intents.push({ t: 'run_tool', call: { ...call, approved: true } })
         continue
       }
-      // Refus : l'appel reçoit son résultat, puis la reprise continue sur le journal complété.
+      // Refusal: the call receives its result, then the resume continues on the completed journal.
       const item = draft(
         resultId(state, callItem(state, call.callId)?.id ?? null, call.callId),
         state.head,
@@ -320,7 +319,7 @@ function resume(s: State, at: string): Step {
         {
           kind: 'tool_result',
           callId: call.callId,
-          output: [{ type: 'text', text: 'Refusé par la personne.' }],
+          output: [{ type: 'text', text: 'Refused by the person.' }],
           isError: true,
         },
       )
@@ -335,7 +334,7 @@ function resume(s: State, at: string): Step {
   const last = answerTrigger(path)
   if (!last) return idle(state, at, intents)
   if (wakeupBudgetExceeded(path, Date.parse(at), state.policy.wakeups)) {
-    // Budget du réveil épuisé : la réponse s'arrête comme une interruption, notée dans le journal.
+    // Wake-up budget exhausted: the response stops like an interruption, recorded in the journal.
     const item = draft(
       serverItemId({
         conversationId: state.conversationId,
@@ -351,7 +350,7 @@ function resume(s: State, at: string): Step {
     return append(state, [item], intents)
   }
 
-  // L'environnement a agi sur une autre branche : le modèle est invité à ré-observer.
+  // The environment acted on another branch: the model is invited to observe again.
   let current = state
   const elsewhere = actedElsewhere(all(current), current.head, current.tools)
   if (elsewhere) {
@@ -371,8 +370,8 @@ function resume(s: State, at: string): Step {
     intents.push(...out.intents)
   }
 
-  // Un instantané des outils par appel au modèle, décidé depuis le journal seul : un tour qui
-  // reconstruit son état prend la même décision qu'un serveur qui le garde en mémoire.
+  // One tool snapshot per model call, decided from the journal alone: a turn that rebuilds its
+  // state makes the same decision as a server that keeps it in memory.
   const snapshot = toolsOnPath(all(current), current.head)
   if (snapshot === undefined || canonicalJson(snapshot) !== canonicalJson(current.tools)) {
     const id = serverItemId({
@@ -391,7 +390,7 @@ function resume(s: State, at: string): Step {
     intents.push(...out.intents)
   }
 
-  // Vue trop grande : le passé est d'abord résumé ; l'appel au modèle suit à la reprise.
+  // View too large: the past is summarized first; the model call follows at the resume.
   const currentPath = pathTo(all(current), current.head)
   const range = compactionRange(currentPath, current.policy.compaction)
   if (range) {
@@ -430,16 +429,16 @@ function resume(s: State, at: string): Step {
 }
 
 /**
- * Conversation au repos : le réveil échu le plus ancien se déclenche, et l'heure du suivant part
- * vers l'hôte. Un réveil ne coupe jamais un travail en cours.
+ * Conversation at rest: the oldest due wake-up fires, and the time of the next one goes to the
+ * host. A wake-up never cuts off work in progress.
  */
 function idle(s: State, at: string, intents: Intent[]): Step {
   const plan = planWakeups(all(s), s.head, s.tools, Date.parse(at), s.policy.wakeups)
   const later: Intent[] = plan.next ? [{ t: 'schedule', at: plan.next }] : []
   if (!plan.due) return { state: s, intents: [...intents, ...later] }
   const { wakeup, occurrence } = plan.due
-  // L'identifiant ne dépend que du réveil et de son occurrence : un réveil livré deux fois
-  // ne se déclenche qu'une fois, quelle que soit la tête.
+  // The identifier depends only on the wake-up and its occurrence: a wake-up delivered twice
+  // fires only once, whatever the head.
   const id = serverItemId({
     conversationId: s.conversationId,
     parentId: null,
@@ -456,7 +455,7 @@ function idle(s: State, at: string, intents: Intent[]): Step {
   return { state: next.state, intents: [...out.intents, ...next.intents] }
 }
 
-/** Réponse à une demande d'approbation : accordée, refusée, ou refusée à l'échéance. */
+/** Answer to an approval request: granted, refused, or refused at the deadline. */
 function approvalResult(
   s: State,
   request: Extract<ItemDraft, { kind: 'tool_call' }>,
@@ -475,7 +474,7 @@ function approvalResult(
       output: [
         {
           type: 'text',
-          text: granted ? 'Accordé.' : o.expired ? 'Refusé : délai dépassé.' : 'Refusé.',
+          text: granted ? 'Granted.' : o.expired ? 'Refused: timed out.' : 'Refused.',
         },
       ],
       as: 'user',
@@ -485,7 +484,7 @@ function approvalResult(
   )
 }
 
-/** Entrée de l'outil `schedule` vers un réveil, ou la raison de son refus. */
+/** Input of the `schedule` tool to a wake-up, or the reason it is refused. */
 function wakeupFrom(callId: string, input: unknown, at: string): Wakeup | string {
   const i = (input ?? {}) as {
     at?: unknown
@@ -494,20 +493,20 @@ function wakeupFrom(callId: string, input: unknown, at: string): Wakeup | string
     payload?: unknown
   }
   if ((i.at === undefined) === (i.inSeconds === undefined)) {
-    return 'Donne soit at (date ISO 8601), soit inSeconds (délai en secondes).'
+    return 'Give either at (ISO 8601 date) or inSeconds (delay in seconds).'
   }
   let when: number
   if (i.at !== undefined) {
     when = typeof i.at === 'string' ? Date.parse(i.at) : Number.NaN
-    if (Number.isNaN(when)) return `Date invalide : ${JSON.stringify(i.at)}.`
+    if (Number.isNaN(when)) return `Invalid date: ${JSON.stringify(i.at)}.`
   } else {
     if (typeof i.inSeconds !== 'number' || !(i.inSeconds >= 0)) {
-      return 'inSeconds doit être un nombre positif.'
+      return 'inSeconds must be a positive number.'
     }
     when = Date.parse(at) + i.inSeconds * 1000
   }
   if (i.every !== undefined && (typeof i.every !== 'string' || !parseDuration(i.every))) {
-    return 'every doit être une durée ISO 8601 en jours, heures, minutes ou secondes (PT15M, P1D).'
+    return 'every must be an ISO 8601 duration in days, hours, minutes or seconds (PT15M, P1D).'
   }
   return {
     id: callId,
@@ -619,7 +618,7 @@ function modelDone(s: State, message: AssistantMessage, at: string): Step {
     rank += 1
   })
 
-  // Un élément ouvert sans partie correspondante garde le texte reçu.
+  // An open item without a matching part keeps the text received.
   for (const leftover of open) {
     const existing = all(state).find((i) => i.id === leftover.id)
     if (!existing) continue
@@ -632,7 +631,7 @@ function modelDone(s: State, message: AssistantMessage, at: string): Step {
   return fresh.length === 0 ? { state, intents: settles } : append(state, fresh, settles)
 }
 
-/** Un appel n'a qu'un résultat : réel ou synthétique, il porte le même identifiant. */
+/** A call has only one result: real or synthetic, it carries the same identifier. */
 function resultId(s: State, callItemId: string | null, callId: string): string {
   return serverItemId({
     conversationId: s.conversationId,
@@ -646,12 +645,12 @@ function toolResult(s: State, e: Extract<EventBody, { t: 'tool_result' }>, at: s
   const call = all(s).find((i) => i.kind === 'tool_call' && i.callId === e.callId)
   if (!call || call.kind !== 'tool_call') return { state: s, intents: [] }
   const spec = toolSpec(s, call.tool)
-  // Seuls les outils de canal enregistrés par l'hôte, et la réponse à une question posée par un
-  // outil (demande d'information MCP), parlent avec l'autorité de la personne.
+  // Only the channel tools registered by the host, and the answer to a question asked by a tool
+  // (MCP information request), speak with the authority of the person.
   const asUser =
     call.channel === 'user' &&
     (call.tool === ELICIT_TOOL || (spec?.channel === 'user' && spec.speaker === 'user'))
-  // Un résultat venu du monde ouvert (web, courrier) ne vaut pas consigne du propriétaire.
+  // A result coming from the open world (web, mail) does not count as an instruction from the owner.
   const untrusted = call.channel === 'environment' && spec?.annotations?.openWorldHint === true
   const item = draft(
     resultId(s, call.id, e.callId),
@@ -668,7 +667,7 @@ function toolResult(s: State, e: Extract<EventBody, { t: 'tool_result' }>, at: s
     },
     untrusted ? { untrusted: true } : undefined,
   )
-  // Les questions encore ouvertes de cet appel deviennent sans objet quand il a son résultat.
+  // The questions of this call that are still open become moot when it has its result.
   const answered = results(s)
   const stale = all(s).flatMap((i) =>
     i.kind === 'tool_call' &&
@@ -683,7 +682,7 @@ function toolResult(s: State, e: Extract<EventBody, { t: 'tool_result' }>, at: s
     const r = draft(resultId(s, q.id, q.callId), parent, at, 'done', {
       kind: 'tool_result',
       callId: q.callId,
-      output: [{ type: 'text', text: 'Question devenue sans objet.' }],
+      output: [{ type: 'text', text: 'Question no longer relevant.' }],
       isError: true,
     })
     parent = r.id
@@ -705,7 +704,7 @@ function interrupt(s: State, at: string): Step {
       draft(id, parent, at, 'done', {
         kind: 'tool_result',
         callId: call.callId,
-        output: [{ type: 'text', text: 'Interrompu par la personne.' }],
+        output: [{ type: 'text', text: 'Interrupted by the person.' }],
         isError: true,
       }),
     )
@@ -728,7 +727,7 @@ function interrupt(s: State, at: string): Step {
   return { state, intents: out.intents }
 }
 
-/** Appel de `schedule` ou de `cancel_wakeup` : l'événement du journal, puis le résultat. */
+/** Call of `schedule` or `cancel_wakeup`: the journal event, then the result. */
 function wakeupCall(
   s: State,
   e: Extract<Event, { t: 'wakeup_scheduled' } | { t: 'wakeup_cancelled' }>,
@@ -761,7 +760,7 @@ function wakeupCall(
     const wakeup = wakeupFrom(e.callId, call.input, e.at)
     if (typeof wakeup === 'string')
       return append(s, [{ ...result(wakeup, true), parentId: s.head }], [])
-    const text = `Réveil ${wakeup.id} prévu le ${wakeup.at}${wakeup.every ? `, puis tous les ${wakeup.every}` : ''}.`
+    const text = `Wake-up ${wakeup.id} scheduled for ${wakeup.at}${wakeup.every ? `, then every ${wakeup.every}` : ''}.`
     return append(
       s,
       chain([event('wakeup_scheduled', { wakeup }), result(text)]),
@@ -775,14 +774,18 @@ function wakeupCall(
       s,
       [
         {
-          ...result(`Aucun réveil prévu ne porte l'identifiant ${String(id)}.`, true),
+          ...result(`No scheduled wake-up has the identifier ${String(id)}.`, true),
           parentId: s.head,
         },
       ],
       [],
     )
   }
-  return append(s, chain([event('wakeup_cancelled', { id }), result(`Réveil ${id} annulé.`)]), [])
+  return append(
+    s,
+    chain([event('wakeup_cancelled', { id }), result(`Wake-up ${id} cancelled.`)]),
+    [],
+  )
 }
 
 export function step(state: State, event: Event): Step {
@@ -808,12 +811,12 @@ export function step(state: State, event: Event): Step {
     case 'model_done':
       return modelDone(state, event.message, event.at)
     case 'model_failed':
-      // Le texte déjà reçu reste, marqué en échec ; rien ne relance le modèle dans ce tour.
+      // The text already received stays, marked as failed; nothing restarts the model in this turn.
       return closeStream(state, 'failed')
     case 'tool_result':
       return toolResult(state, event, event.at)
     case 'tools_changed':
-      // L'hôte déclare les outils configurés ; l'instantané est écrit par `resume`, avant l'appel au modèle.
+      // The host declares the configured tools; the snapshot is written by `resume`, before the model call.
       return { state: { ...state, tools: event.tools }, intents: [] }
     case 'persisted': {
       const seqs = new Map(event.items.map((i) => [i.id, i.seq]))
@@ -888,7 +891,7 @@ export function step(state: State, event: Event): Step {
     }
     case 'external_event': {
       const { source, name, data, trust } = event
-      // Une livraison répétée du même événement sous le même parent ne forme qu'un élément.
+      // A repeated delivery of the same event under the same parent forms only one item.
       const id = serverItemId({
         conversationId: state.conversationId,
         parentId: state.head,

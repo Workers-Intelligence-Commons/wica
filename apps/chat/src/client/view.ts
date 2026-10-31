@@ -1,6 +1,6 @@
-// Vue d'une conversation pour l'écran : les lignes synchronisées redeviennent des éléments du
-// journal, les lots d'un élément en flux sont assemblés par `idx`, puis `deriveView` du paquet
-// `client` du Harness construit la vue.
+// View of a conversation for the screen: the synchronized rows become journal items again, the
+// batches of a streaming item are assembled by `idx`, then `deriveView` from the Harness `client`
+// package builds the view.
 
 import { deriveView, type ConversationView } from '@wica/client'
 import type { Item } from '@wica/core'
@@ -8,7 +8,7 @@ import type { Item } from '@wica/core'
 import { type ChunkRow, rowToItem } from '../shared/rows.ts'
 import type { ItemShapeRow } from './collections.ts'
 
-/** Texte en cours de chaque élément, ses lots dans l'ordre de leur `idx`. */
+/** Current text of each item, its batches in the order of their `idx`. */
 export function liveText(chunks: readonly ChunkRow[]): Map<string, string> {
   const byItem = new Map<string, ChunkRow[]>()
   for (const chunk of chunks) {
@@ -37,9 +37,9 @@ export function conversationView(
 }
 
 /**
- * Versions d'un message ou d'une réponse : ses frères dans l'arbre, dans l'ordre, et sa place parmi
- * eux. Une réponse régénérée est l'enfant d'un événement `regenerate` posé à côté de la réponse
- * d'origine : c'est cet événement qui porte sa version.
+ * Versions of a message or a response: its siblings in the tree, in order, and its place among
+ * them. A regenerated response is the child of a `regenerate` event placed next to the original
+ * response: that event carries its version.
  */
 export function branchesOf(items: readonly Item[], itemId: string) {
   const byId = new Map(items.map((i) => [i.id, i]))
@@ -59,7 +59,7 @@ export function branchesOf(items: readonly Item[], itemId: string) {
 
 const isRegenerate = (item: Item) => item.kind === 'event' && item.name === 'regenerate'
 
-/** Tête à afficher après le choix d'une autre branche : la dernière feuille sous cet élément. */
+/** Head to show after choosing another branch: the last leaf under this item. */
 export function leafUnder(items: readonly Item[], itemId: string): string {
   const children = new Map<string, Item[]>()
   for (const item of items) {

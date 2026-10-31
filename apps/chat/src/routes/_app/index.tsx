@@ -1,6 +1,6 @@
-// Nouvelle conversation : choix du serveur (embarqué ou distant) et du modèle, puis premier
-// message. La conversation est créée par l'API, attendue par la synchro, et le message part
-// aussitôt, affiché avant sa confirmation.
+// New conversation: choice of the server (embedded or remote) and of the model, then the first
+// message. The conversation is created by the API, awaited through the sync, and the message
+// leaves right away, shown before its confirmation.
 
 import { eq, isNull, useDbClient, useLiveQuery } from '@tanstack/react-db'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
@@ -45,8 +45,8 @@ function NewConversation() {
   })
   const [serverId, setServerId] = useState<string>('')
   const [model, setModel] = useState<string>('')
-  // Sans modèle par défaut, la liste commence par un autre modèle : le choix suit ce qui est
-  // affiché, au lieu d'envoyer le modèle par défaut absent.
+  // Without a default model, the list starts with another model: the choice follows what is
+  // shown, instead of sending the absent default model.
   useEffect(() => {
     if (models && !models.some((m) => (m.id ?? '') === model)) setModel(models[0]?.id ?? '')
   }, [models, model])

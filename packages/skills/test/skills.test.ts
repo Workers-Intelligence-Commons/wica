@@ -7,66 +7,65 @@ const files: Record<string, string> = {
     '---',
     'name: pdf-forms',
     'description: >',
-    '  Remplit des formulaires PDF.',
-    '  À utiliser quand la personne fournit un PDF à compléter.',
+    '  Fills in PDF forms.',
+    '  Use when the person provides a PDF to complete.',
     'license: MIT',
     'allowed-tools: read_file bash',
     'metadata:',
     '  author: wica',
     '---',
     '',
-    '# Formulaires',
+    '# Forms',
     '',
-    'Lire `reference/champs.md` avant de commencer.',
+    'Read `reference/fields.md` before starting.',
   ].join('\r\n'),
-  'skills/pdf-forms/reference/champs.md': 'Liste des champs.',
+  'skills/pdf-forms/reference/fields.md': 'List of the fields.',
 }
 
 const read = async (path: string) => {
   const text = files[path]
-  if (text === undefined) throw new Error(`absent : ${path}`)
+  if (text === undefined) throw new Error(`absent: ${path}`)
   return text
 }
 
 describe('parseSkill', () => {
-  it('lit l’en-tête et le corps d’un SKILL.md', () => {
+  it('reads the header and the body of a SKILL.md', () => {
     const { descriptor, body } = parseSkill(files['skills/pdf-forms/SKILL.md']!, 'skills/pdf-forms')
     expect(descriptor).toEqual({
       name: 'pdf-forms',
-      description:
-        'Remplit des formulaires PDF. À utiliser quand la personne fournit un PDF à compléter.',
+      description: 'Fills in PDF forms. Use when the person provides a PDF to complete.',
       location: 'skills/pdf-forms',
       license: 'MIT',
       metadata: { author: 'wica' },
       allowedTools: ['read_file', 'bash'],
     })
-    expect(body).toBe('# Formulaires\n\nLire `reference/champs.md` avant de commencer.')
+    expect(body).toBe('# Forms\n\nRead `reference/fields.md` before starting.')
   })
 
-  it('refuse un nom qui ne correspond pas au dossier', () => {
-    expect(() => parseSkill('---\nname: autre\ndescription: x\n---\n', 'skills/pdf-forms')).toThrow(
+  it('refuses a name that does not match the folder', () => {
+    expect(() => parseSkill('---\nname: other\ndescription: x\n---\n', 'skills/pdf-forms')).toThrow(
       SkillFormatError,
     )
   })
 })
 
 describe('skillsKit', () => {
-  it('ne donne que nom et description, puis charge le skill et ses fichiers à la demande', async () => {
+  it('gives only name and description, then loads the skill and its files on demand', async () => {
     const skills = await loadSkills(['skills/pdf-forms'], read)
     const kit = skillsKit(skills, read)
-    expect(kit.instructions).toContain('- pdf-forms : Remplit des formulaires PDF.')
-    expect(kit.instructions).not.toContain('Formulaires')
+    expect(kit.instructions).toContain('- pdf-forms: Fills in PDF forms.')
+    expect(kit.instructions).not.toContain('Forms')
 
     const [tool] = kit.tools
     expect(await tool!.run({ name: 'pdf-forms' })).toEqual([
-      { type: 'text', text: '# Formulaires\n\nLire `reference/champs.md` avant de commencer.' },
+      { type: 'text', text: '# Forms\n\nRead `reference/fields.md` before starting.' },
     ])
-    expect(await tool!.run({ name: 'pdf-forms', file: 'reference/champs.md' })).toEqual([
-      { type: 'text', text: 'Liste des champs.' },
+    expect(await tool!.run({ name: 'pdf-forms', file: 'reference/fields.md' })).toEqual([
+      { type: 'text', text: 'List of the fields.' },
     ])
   })
 
-  it('refuse un fichier hors du dossier du skill', async () => {
+  it('refuses a file outside the skill folder', async () => {
     const kit = skillsKit(await loadSkills(['skills/pdf-forms'], read), read)
     await expect(kit.tools[0]!.run({ name: 'pdf-forms', file: '../../secret' })).rejects.toThrow(
       SkillFormatError,

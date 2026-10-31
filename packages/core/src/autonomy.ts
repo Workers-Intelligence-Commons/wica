@@ -1,25 +1,24 @@
-// Agents autonomes :
-// réveils, garde-fous sans humain et reprise d'une ancienne branche. Tout se décide depuis le
-// journal et l'heure reçue par l'événement : un tour sans état prend la même décision qu'un
-// serveur qui garde l'état en mémoire.
+// Autonomous agents: wake-ups, guardrails without a human, and resuming an old branch. Everything
+// is decided from the journal and the time received with the event: a stateless turn makes the
+// same decision as a server that keeps the state in memory.
 
 import type { ItemDraft, Wakeup } from './journal.ts'
 import { HARNESS_TOOLS, type ToolSpec } from './model.ts'
 import { pathTo } from './tree.ts'
 
-/** Garde-fous des réveils, réglés par l'hôte. */
+/** Wake-up guardrails, set by the host. */
 export type WakeupPolicy = {
-  /** Réveils déclenchés au plus par période ; au-delà, le suivant attend la fin de la période. */
+  /** Wake-ups fired at most per period; beyond that, the next one waits for the end of the period. */
   maxPerPeriod?: number
-  /** Durée de la période du plafond. 24 h par défaut. */
+  /** Length of the cap period. 24 h by default. */
   periodMs?: number
-  /** Appels au modèle par réveil ; au-delà, la réponse au réveil s'arrête. */
+  /** Model calls per wake-up; beyond that, the response to the wake-up stops. */
   maxModelCalls?: number
-  /** Durée d'une réponse à un réveil, comptée depuis le réveil. */
+  /** Duration of a response to a wake-up, counted from the wake-up. */
   maxDurationMs?: number
   /**
-   * Réveils de suite sans rien de nouveau avant la pause automatique. 3 par défaut. La pause
-   * dure jusqu'au prochain message d'une personne ou événement externe.
+   * Consecutive wake-ups with nothing new before the automatic pause. 3 by default. The pause
+   * lasts until the next message from a person or external event.
    */
   pauseAfterIdle?: number
 }
@@ -28,8 +27,8 @@ const DAY_MS = 24 * 60 * 60 * 1000
 const DEFAULT_PAUSE_AFTER_IDLE = 3
 
 /**
- * Durée ISO 8601 en jours, heures, minutes et secondes (`P1D`, `PT15M`, `PT0.5S`), en
- * millisecondes. Un jour vaut 24 heures, sans calendrier ni heure d'été.
+ * ISO 8601 duration in days, hours, minutes and seconds (`P1D`, `PT15M`, `PT0.5S`), in
+ * milliseconds. A day is 24 hours, without calendar or daylight saving time.
  */
 export function parseDuration(text: string): number | undefined {
   const match = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(text)
@@ -43,7 +42,7 @@ export function parseDuration(text: string): number | undefined {
 const eventData = <T>(items: readonly ItemDraft[], name: string): T[] =>
   items.flatMap((i) => (i.kind === 'event' && i.name === name ? [i.data as T] : []))
 
-/** Réveils prévus et pas annulés, dans l'ordre où ils ont été prévus. */
+/** Wake-ups scheduled and not cancelled, in the order in which they were scheduled. */
 export function scheduledWakeups(items: readonly ItemDraft[]): Wakeup[] {
   const cancelled = new Set(eventData<{ id: string }>(items, 'wakeup_cancelled').map((d) => d.id))
   return eventData<{ wakeup: Wakeup }>(items, 'wakeup_scheduled')
@@ -53,7 +52,7 @@ export function scheduledWakeups(items: readonly ItemDraft[]): Wakeup[] {
 
 type Fired = { id: string; at: string }
 
-/** Occurrence échue la plus récente d'un réveil, pas encore déclenchée. */
+/** Most recent due occurrence of a wake-up, not yet fired. */
 function dueOccurrence(wakeup: Wakeup, fired: Fired[], now: number): number | undefined {
   const start = Date.parse(wakeup.at)
   if (now < start) return undefined
@@ -62,12 +61,12 @@ function dueOccurrence(wakeup: Wakeup, fired: Fired[], now: number): number | un
     ...fired.filter((f) => f.id === wakeup.id).map((f) => Date.parse(f.at)),
   )
   const every = wakeup.every !== undefined ? parseDuration(wakeup.every) : undefined
-  // Des occurrences manquées (machine endormie) ne déclenchent qu'un réveil, le plus récent.
+  // Missed occurrences (machine asleep) fire only one wake-up, the most recent one.
   const occurrence = every ? start + Math.floor((now - start) / every) * every : start
   return occurrence > last ? occurrence : undefined
 }
 
-/** Prochaine occurrence d'un réveil après `now`. */
+/** Next occurrence of a wake-up after `now`. */
 function nextOccurrence(wakeup: Wakeup, fired: Fired[], now: number): number | undefined {
   const start = Date.parse(wakeup.at)
   const every = wakeup.every !== undefined ? parseDuration(wakeup.every) : undefined
@@ -77,7 +76,7 @@ function nextOccurrence(wakeup: Wakeup, fired: Fired[], now: number): number | u
   return now < start ? start : start + (Math.floor((now - start) / every) + 1) * every
 }
 
-/** Éléments produits par le modèle, par opposition aux entrées et aux ajouts du Harness. */
+/** Items produced by the model, as opposed to inputs and to Harness additions. */
 const fromModel = (i: ItemDraft) =>
   i.kind === 'assistant_text' ||
   i.kind === 'reasoning' ||
@@ -89,8 +88,8 @@ const isTrigger = (i: ItemDraft) =>
   (i.kind === 'event' && i.name === 'wakeup_fired')
 
 /**
- * Ce qu'une réponse à un réveil apporte : ce qu'elle montre ou demande à une personne et les
- * outils qui agissent. Deux réponses de même signature sans outil qui agit n'apportent rien.
+ * What a response to a wake-up brings: what it shows or asks a person, and the tools that act.
+ * Two responses with the same signature and no acting tool bring nothing.
  */
 function novelty(segment: readonly ItemDraft[], tools: readonly ToolSpec[]) {
   let acts = false
@@ -105,9 +104,9 @@ function novelty(segment: readonly ItemDraft[], tools: readonly ToolSpec[]) {
 }
 
 /**
- * Pause automatique : les dernières réponses à des réveils, depuis le dernier message d'une
- * personne ou événement externe, n'ont rien apporté de nouveau (aucun outil qui agit, et ce
- * qu'elles montrent répète la réponse précédente).
+ * Automatic pause: the last responses to wake-ups, since the last message from a person or
+ * external event, brought nothing new (no acting tool, and what they show repeats the previous
+ * response).
  */
 export function wakeupsPaused(
   path: readonly ItemDraft[],
@@ -121,8 +120,8 @@ export function wakeupsPaused(
   )
   if (starts.length < limit) return false
   const segments = starts.map((s, k) => novelty(path.slice(s + 1, starts[k + 1]), tools))
-  // Chaque réponse est comparée à celle qui la précède ; la première à la dernière parole venue
-  // d'avant les réveils, qu'on ne connaît pas : elle compte comme nouvelle.
+  // Each response is compared with the one before it; the first one with the last speech from
+  // before the wake-ups, which is unknown: it counts as new.
   let idle = 0
   for (let k = segments.length - 1; k > 0 && idle < limit; k--) {
     const current = segments[k]
@@ -134,13 +133,13 @@ export function wakeupsPaused(
 }
 
 export type WakeupPlan = {
-  /** Réveil à déclencher maintenant, avec son occurrence. */
+  /** Wake-up to fire now, with its occurrence. */
   due?: { wakeup: Wakeup; occurrence: string }
-  /** Heure à laquelle l'hôte doit réveiller la conversation pour la suite. */
+  /** Time at which the host must wake the conversation for what follows. */
   next?: string
 }
 
-/** Réveils à déclencher maintenant et prochaine heure de réveil, d'après le journal. */
+/** Wake-ups to fire now and next wake-up time, according to the journal. */
 export function planWakeups(
   items: readonly ItemDraft[],
   head: string | null,
@@ -170,7 +169,7 @@ export function planWakeups(
     const period = policy.periodMs ?? DAY_MS
     const recent = fired.map((f) => Date.parse(f.at)).filter((t) => t > now - period)
     if (recent.length >= policy.maxPerPeriod) {
-      // Plafond atteint : le réveil attend que le plus ancien de la période en sorte.
+      // Cap reached: the wake-up waits until the oldest one of the period leaves it.
       return withNext(next([Math.min(...recent) + period]))
     }
   }
@@ -183,8 +182,8 @@ export function planWakeups(
 const withNext = (next: string | undefined): WakeupPlan => (next ? { next } : {})
 
 /**
- * Budget d'une réponse à un réveil dépassé : trop d'appels au modèle depuis le réveil, ou trop
- * de temps. Une réponse à une personne ou à un événement externe n'a pas ce budget.
+ * Budget of a response to a wake-up exceeded: too many model calls since the wake-up, or too much
+ * time. A response to a person or to an external event has no such budget.
  */
 export function wakeupBudgetExceeded(
   path: readonly ItemDraft[],
@@ -204,9 +203,9 @@ export function wakeupBudgetExceeded(
 }
 
 /**
- * Appels qui ont agi sur l'environnement depuis une autre branche, et que le chemin affiché n'a
- * pas encore signalés : leur `callId` et l'ancêtre commun le plus proche. Les outils en lecture
- * seule et le canal utilisateur n'agissent pas.
+ * Calls that acted on the environment from another branch, and that the displayed path has not
+ * reported yet: their `callId` and the closest common ancestor. Read-only tools and the user
+ * channel do not act.
  */
 export function actedElsewhere(
   items: readonly ItemDraft[],

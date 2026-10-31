@@ -1,5 +1,5 @@
-// Outils du canal utilisateur : `ask_user` pose une question que le client affiche, `say` parle à la personne.
-// Les déclarations sont pures ; seul `say` a une fonction, qui accuse réception.
+// User channel tools: `ask_user` asks a question that the client shows, `say` speaks to the person.
+// The declarations are pure; only `say` has a function, which acknowledges receipt.
 
 import { ELICIT_TOOL, type Item, type Part, type ToolSpec } from '@wica/core'
 
@@ -22,7 +22,7 @@ export type AskUserInput =
   | { kind: 'confirm'; question: string }
   | { kind: 'form'; question: string; fields: AskField[] }
 
-/** Valeur que le client renvoie par `answer`, selon la sorte de question. */
+/** Value the client sends back through `answer`, according to the kind of question. */
 export type AskUserAnswer =
   | { kind: 'choice'; label: string }
   | { kind: 'multiple'; labels: string[] }
@@ -37,7 +37,7 @@ const option = {
   properties: {
     label: { type: 'string' },
     description: { type: 'string' },
-    preview: { type: 'string', description: 'Aperçu montré quand l’option est en vue.' },
+    preview: { type: 'string', description: 'Preview shown when the option is in view.' },
   },
   required: ['label'],
 }
@@ -45,7 +45,7 @@ const option = {
 export const askUserSpec: ToolSpec = {
   name: ASK_USER_TOOL,
   description:
-    'Pose une question à la personne et attend sa réponse : choix unique ou multiple, texte libre, confirmation, ou formulaire à champs typés.',
+    'Asks the person a question and waits for their answer: single or multiple choice, free text, confirmation, or a form with typed fields.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -78,7 +78,7 @@ export const askUserSpec: ToolSpec = {
 
 export const saySpec: ToolSpec = {
   name: SAY_TOOL,
-  description: 'Dit un message à la personne. Le texte libre reste privé : seul ce message est vu.',
+  description: 'Says a message to the person. Free text stays private: only this message is seen.',
   inputSchema: {
     type: 'object',
     properties: { text: { type: 'string' } },
@@ -89,16 +89,16 @@ export const saySpec: ToolSpec = {
   runsOn: 'server',
 }
 
-/** `say` prêt pour `createHarness` : le message est l'appel lui-même, le résultat un accusé. */
+/** `say` ready for `createHarness`: the message is the call itself, the result an acknowledgement. */
 export const say = {
   spec: saySpec,
-  run: async (): Promise<Part[]> => [{ type: 'text', text: 'Message transmis.' }],
+  run: async (): Promise<Part[]> => [{ type: 'text', text: 'Message delivered.' }],
 }
 
-/** `ask_user` prêt pour `createHarness` : seulement déclaré, il s'exécute chez le client. */
+/** `ask_user` ready for `createHarness`: only declared, it runs on the client. */
 export const askUser = { spec: askUserSpec }
 
-/** Outils du canal utilisateur, dans un ordre stable. */
+/** User channel tools, in a stable order. */
 export const userTools = [askUser, say]
 
 const words = (answer: AskUserAnswer): string => {
@@ -106,16 +106,16 @@ const words = (answer: AskUserAnswer): string => {
     case 'choice':
       return answer.label
     case 'multiple':
-      return answer.labels.length > 0 ? answer.labels.join(', ') : 'Aucune option.'
+      return answer.labels.length > 0 ? answer.labels.join(', ') : 'No option.'
     case 'text':
       return answer.text
     case 'confirm':
-      return answer.yes ? 'Oui.' : 'Non.'
+      return answer.yes ? 'Yes.' : 'No.'
     case 'form':
       return Object.entries(answer.values)
         .map(
           ([name, value]) =>
-            `${name} : ${typeof value === 'boolean' ? (value ? 'oui' : 'non') : value}`,
+            `${name}: ${typeof value === 'boolean' ? (value ? 'yes' : 'no') : value}`,
         )
         .join('\n')
   }
@@ -128,7 +128,7 @@ const isAnswer = (value: unknown): value is AskUserAnswer =>
     (value as { kind?: string }).kind ?? '',
   )
 
-/** Réponse à une demande d'information d'un serveur MCP (forme `ElicitResult` de MCP). */
+/** Answer to an information request of an MCP server (MCP `ElicitResult` shape). */
 export type ElicitAnswer = {
   action: 'accept' | 'decline' | 'cancel'
   content?: Record<string, string | number | boolean | string[]>
@@ -140,27 +140,27 @@ const isElicitResult = (value: unknown): value is ElicitAnswer =>
   ['accept', 'decline', 'cancel'].includes((value as { action?: string }).action ?? '')
 
 const elicitWords = (answer: ElicitAnswer): string => {
-  if (answer.action === 'decline') return 'Je refuse de répondre.'
-  if (answer.action === 'cancel') return 'Annulé.'
+  if (answer.action === 'decline') return 'I refuse to answer.'
+  if (answer.action === 'cancel') return 'Cancelled.'
   const fields = Object.entries(answer.content ?? {})
-  if (fields.length === 0) return 'Oui.'
+  if (fields.length === 0) return 'Yes.'
   return fields
     .map(([name, value]) => {
       const shown = Array.isArray(value)
         ? value.join(', ')
         : typeof value === 'boolean'
           ? value
-            ? 'oui'
-            : 'non'
+            ? 'yes'
+            : 'no'
           : String(value)
-      return `${name} : ${shown}`
+      return `${name}: ${shown}`
     })
     .join('\n')
 }
 
 /**
- * Rend une réponse de la personne en parties du journal, dans ses mots : c'est ce que le modèle
- * lira comme sa parole. À passer en `renderAnswer` à `createHarness`.
+ * Renders an answer from the person into journal parts, in their words: this is what the model
+ * will read as their speech. To pass as `renderAnswer` to `createHarness`.
  */
 export function renderAnswer(
   call: Extract<Item, { kind: 'tool_call' }> | undefined,

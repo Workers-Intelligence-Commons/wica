@@ -1,8 +1,7 @@
-// Adaptateur ACP : un éditeur pilote le Harness par
-// l'Agent Client Protocol. L'adaptateur est un client du protocole Wica, comme le web et la
-// ligne de commande : il envoie les messages de l'éditeur, lui rend le flux de la conversation,
-// lui pose les questions et les approbations, et exécute pour le serveur les outils que l'éditeur
-// fournit (ses fichiers et son terminal), déclarés `runsOn: 'client'`.
+// ACP adapter: an editor drives the Harness through the Agent Client Protocol. The adapter is a
+// client of the Wica protocol, like the web and the command line: it sends the editor's messages,
+// returns the conversation stream to it, asks it the questions and approvals, and runs for the
+// server the tools the editor provides (its files and its terminal), declared `runsOn: 'client'`.
 
 import * as acp from '@agentclientprotocol/sdk'
 import type { Client, ConversationView } from '@wica/client'
@@ -21,12 +20,12 @@ export const READ_TEXT_FILE_TOOL = 'read_text_file'
 export const WRITE_TEXT_FILE_TOOL = 'write_text_file'
 export const RUN_COMMAND_TOOL = 'run_command'
 
-/** Ce que l'éditeur fournit comme outils, d'après ses capacités annoncées à `initialize`. */
+/** What the editor provides as tools, according to the capabilities it announced at `initialize`. */
 export type EditorCapabilities = {
   readTextFile: boolean
   writeTextFile: boolean
   terminal: boolean
-  /** L'éditeur sait poser un formulaire, ou ouvrir une adresse, à la personne. */
+  /** The editor can show a form, or open an address, to the person. */
   forms: boolean
   urls: boolean
 }
@@ -34,14 +33,13 @@ export type EditorCapabilities = {
 const editorToolSpecs: Record<string, ToolSpec> = {
   [READ_TEXT_FILE_TOOL]: {
     name: READ_TEXT_FILE_TOOL,
-    description:
-      'Lit un fichier texte ouvert dans l’éditeur, y compris ses modifications non enregistrées.',
+    description: 'Reads a text file open in the editor, including its unsaved changes.',
     inputSchema: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'Chemin absolu, ou relatif au dossier de travail.' },
-        line: { type: 'integer', minimum: 1, description: 'Première ligne lue.' },
-        limit: { type: 'integer', minimum: 1, description: 'Nombre de lignes lues.' },
+        path: { type: 'string', description: 'Absolute path, or relative to the working folder.' },
+        line: { type: 'integer', minimum: 1, description: 'First line read.' },
+        limit: { type: 'integer', minimum: 1, description: 'Number of lines read.' },
       },
       required: ['path'],
       additionalProperties: false,
@@ -57,11 +55,11 @@ const editorToolSpecs: Record<string, ToolSpec> = {
   },
   [WRITE_TEXT_FILE_TOOL]: {
     name: WRITE_TEXT_FILE_TOOL,
-    description: 'Écrit un fichier texte par l’éditeur, qui montre la modification.',
+    description: 'Writes a text file through the editor, which shows the change.',
     inputSchema: {
       type: 'object',
       properties: {
-        path: { type: 'string', description: 'Chemin absolu, ou relatif au dossier de travail.' },
+        path: { type: 'string', description: 'Absolute path, or relative to the working folder.' },
         content: { type: 'string' },
       },
       required: ['path', 'content'],
@@ -78,13 +76,13 @@ const editorToolSpecs: Record<string, ToolSpec> = {
   },
   [RUN_COMMAND_TOOL]: {
     name: RUN_COMMAND_TOOL,
-    description: 'Lance une commande dans un terminal de l’éditeur et rend sa sortie.',
+    description: 'Runs a command in a terminal of the editor and returns its output.',
     inputSchema: {
       type: 'object',
       properties: {
         command: { type: 'string' },
         args: { type: 'array', items: { type: 'string' } },
-        cwd: { type: 'string', description: 'Dossier absolu ; le dossier de travail par défaut.' },
+        cwd: { type: 'string', description: 'Absolute folder; the working folder by default.' },
       },
       required: ['command'],
       additionalProperties: false,
@@ -100,7 +98,7 @@ const editorToolSpecs: Record<string, ToolSpec> = {
   },
 }
 
-/** Outils que le serveur déclare pour une session de cet éditeur ; il ne les exécute pas. */
+/** Tools the server declares for a session of this editor; it does not run them. */
 export function editorTools(capabilities: EditorCapabilities): { spec: ToolSpec }[] {
   return [
     ...(capabilities.readTextFile ? [READ_TEXT_FILE_TOOL] : []),
@@ -109,7 +107,7 @@ export function editorTools(capabilities: EditorCapabilities): { spec: ToolSpec 
   ].map((name) => ({ spec: editorToolSpecs[name]! }))
 }
 
-/** Une session de l'éditeur, liée à une conversation du serveur. */
+/** A session of the editor, linked to a conversation of the server. */
 export type AcpSession = {
   conversationId: string
   cwd: string
@@ -118,31 +116,31 @@ export type AcpSession = {
 }
 
 export type AcpOptions = {
-  /** Client du protocole Wica, déjà connecté au serveur. */
+  /** Client of the Wica protocol, already connected to the server. */
   client: Client
   agentInfo?: { name: string; version: string }
   /**
-   * Une session s'ouvre ou se recharge : l'hôte y prépare les outils de la conversation
-   * (`editorTools`, serveurs MCP de l'éditeur).
+   * A session opens or reloads: the host prepares the conversation tools there (`editorTools`,
+   * MCP servers of the editor).
    */
   onSession?: (session: AcpSession) => void | Promise<void>
-  /** Transports MCP que l'hôte sait ouvrir pour les serveurs fournis par l'éditeur. */
+  /** MCP transports the host can open for the servers provided by the editor. */
   mcpCapabilities?: { http?: boolean; sse?: boolean }
 }
 
-/** Contenu d'un message de l'éditeur vers les parties du journal. */
+/** Content of an editor message, turned into journal parts. */
 export function toParts(blocks: acp.ContentBlock[]): Part[] {
   return blocks.flatMap((block): Part[] => {
     switch (block.type) {
       case 'text':
         return [{ type: 'text', text: block.text }]
       case 'resource_link':
-        return [{ type: 'text', text: `Ressource : ${block.name} (${block.uri})` }]
+        return [{ type: 'text', text: `Resource: ${block.name} (${block.uri})` }]
       case 'resource': {
         const resource = block.resource as { uri: string; text?: string }
         return resource.text !== undefined
-          ? [{ type: 'text', text: `Contenu de ${resource.uri} :\n${resource.text}` }]
-          : [{ type: 'text', text: `Ressource : ${resource.uri}` }]
+          ? [{ type: 'text', text: `Content of ${resource.uri}:\n${resource.text}` }]
+          : [{ type: 'text', text: `Resource: ${resource.uri}` }]
       }
       default:
         return []
@@ -151,7 +149,7 @@ export function toParts(blocks: acp.ContentBlock[]): Part[] {
 }
 
 const textOf = (parts: readonly Part[]) =>
-  parts.map((p) => (p.type === 'text' ? p.text : `[fichier ${p.mediaType}]`)).join('\n')
+  parts.map((p) => (p.type === 'text' ? p.text : `[file ${p.mediaType}]`)).join('\n')
 
 const toolKind = (call: Call): acp.ToolKind => {
   if (call.tool === READ_TEXT_FILE_TOOL) return 'read'
@@ -174,22 +172,22 @@ const STATUS: Record<'running' | 'awaiting_approval' | 'done' | 'error', acp.Too
 
 type SessionState = AcpSession & {
   cancelled: boolean
-  /** Ce qui a déjà été montré à l'éditeur : texte par élément, état par appel. */
+  /** What has already been shown to the editor: text per item, state per call. */
   shownText: Map<string, number>
   shownTools: Map<string, acp.ToolCallStatus>
-  /** Questions posées et appels exécutés, pour ne rien faire deux fois. */
+  /** Questions asked and calls run, so that nothing is done twice. */
   handled: Set<string>
   inFlight: number
 }
 
-/** Une valeur reçue de l'éditeur ou du modèle, lue comme texte. */
+/** A value received from the editor or from the model, read as text. */
 const stringOf = (value: unknown) =>
   typeof value === 'string' ? value : value === undefined ? '' : JSON.stringify(value)
 
 const absolute = (cwd: string, path: string) =>
   path.startsWith('/') ? path : `${cwd.replace(/\/+$/, '')}/${path}`
 
-/** Agent ACP qui pilote le Harness par un client du protocole Wica. */
+/** ACP agent that drives the Harness through a client of the Wica protocol. */
 export function acpAgent(options: AcpOptions): acp.AgentApp {
   const { client } = options
   const sessions = new Map<string, SessionState>()
@@ -201,13 +199,13 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
     urls: false,
   }
 
-  /** Les notifications partent dans l'ordre où la conversation avance. */
+  /** Notifications leave in the order in which the conversation moves forward. */
   let chain: Promise<unknown> = Promise.resolve()
   const notify = (editor: acp.AgentContext, sessionId: string, update: acp.SessionUpdate) => {
     chain = chain.then(() => editor.notify('session/update', { sessionId, update })).catch(() => {})
   }
 
-  /** Montre ce qui a changé dans la conversation depuis la dernière fois. */
+  /** Shows what changed in the conversation since the last time. */
   const report = (
     editor: acp.AgentContext,
     session: SessionState,
@@ -217,7 +215,7 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
     const id = session.conversationId
     for (const entry of view.entries) {
       if (entry.type === 'user') {
-        // Pendant un tour, le message vient de l'éditeur lui-même : il n'est pas renvoyé.
+        // During a turn, the message comes from the editor itself: it is not sent back.
         if (session.shownText.has(entry.item.id)) continue
         session.shownText.set(entry.item.id, 1)
         if (!replay) continue
@@ -306,8 +304,8 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
     const input = call.input as AskUserInput
     if (input.kind === 'confirm') {
       const choice = await permission(editor, session, call.callId, input.question, [
-        { optionId: 'yes', name: 'Oui', kind: 'allow_once' },
-        { optionId: 'no', name: 'Non', kind: 'reject_once' },
+        { optionId: 'yes', name: 'Yes', kind: 'allow_once' },
+        { optionId: 'no', name: 'No', kind: 'reject_once' },
       ])
       return { kind: 'confirm', yes: choice === 'yes' }
     }
@@ -322,11 +320,11 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
       const picked = choice === null ? undefined : input.options[Number(choice)]
       return picked
         ? { kind: 'choice', label: picked.label }
-        : { kind: 'text', text: 'Je préfère ne pas répondre.' }
+        : { kind: 'text', text: 'I prefer not to answer.' }
     }
     if (!capabilities.forms) {
-      // L'éditeur ne sait pas poser cette question : la réponse le dit, sans rien inventer.
-      return { kind: 'text', text: 'Je ne peux pas répondre à cette question depuis l’éditeur.' }
+      // The editor cannot ask this question: the answer says so, without inventing anything.
+      return { kind: 'text', text: 'I cannot answer this question from the editor.' }
     }
     const labels = 'options' in input ? input.options.map((o) => o.label) : []
     const schema =
@@ -357,7 +355,7 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
           }
     const response = await form(editor, session, input.question, schema)
     const content = response.content ?? {}
-    if (response.action !== 'accept') return { kind: 'text', text: 'Je préfère ne pas répondre.' }
+    if (response.action !== 'accept') return { kind: 'text', text: 'I prefer not to answer.' }
     switch (input.kind) {
       case 'choice':
         return { kind: 'choice', label: stringOf(content['answer']) }
@@ -415,14 +413,14 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
     return { action: response.action === 'cancel' ? 'cancel' : 'decline' }
   }
 
-  /** Répond à une question du canal utilisateur par une demande de l'éditeur. */
+  /** Answers a question of the user channel with a request from the editor. */
   const answerQuestion = async (editor: acp.AgentContext, session: SessionState, call: Call) => {
     const id = session.conversationId
     if (call.tool === APPROVAL_TOOL) {
       const input = call.input as { callId: string; question: string }
       const choice = await permission(editor, session, input.callId, input.question, [
-        { optionId: 'allow', name: 'Autoriser', kind: 'allow_once' },
-        { optionId: 'reject', name: 'Refuser', kind: 'reject_once' },
+        { optionId: 'allow', name: 'Allow', kind: 'allow_once' },
+        { optionId: 'reject', name: 'Refuse', kind: 'reject_once' },
       ])
       return client.answer(id, call.callId, choice === 'allow')
     }
@@ -432,7 +430,7 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
       return client.answer(id, call.callId, await elicit(editor, session, call))
   }
 
-  /** Exécute pour le serveur un outil fourni par l'éditeur. */
+  /** Runs for the server a tool provided by the editor. */
   const runForServer = async (
     editor: acp.AgentContext,
     session: SessionState,
@@ -457,7 +455,7 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
           path,
           content: stringOf(input['content']),
         })
-        return { output: [{ type: 'text', text: `Écrit : ${path}` }] }
+        return { output: [{ type: 'text', text: `Written: ${path}` }] }
       }
       if (call.tool === RUN_COMMAND_TOOL) {
         const terminal = await editor.createTerminal({
@@ -471,9 +469,7 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
           const { output } = await terminal.currentOutput()
           const code = exit.exitCode ?? null
           return {
-            output: [
-              { type: 'text', text: `${output}\n[code de sortie : ${code ?? exit.signal}]` },
-            ],
+            output: [{ type: 'text', text: `${output}\n[exit code: ${code ?? exit.signal}]` }],
             ...(code === 0 ? {} : { isError: true }),
           }
         } finally {
@@ -481,7 +477,7 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
         }
       }
       return {
-        output: [{ type: 'text', text: `Outil inconnu de l’éditeur : ${call.tool}` }],
+        output: [{ type: 'text', text: `Tool unknown to the editor: ${call.tool}` }],
         isError: true,
       }
     } catch (error) {
@@ -493,9 +489,9 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
   }
 
   /**
-   * Lance une fois chaque question et chaque outil confié, et compte ce qui est en cours. Une
-   * demande ne part qu'après les notifications qui la précèdent, pour que l'éditeur connaisse
-   * déjà l'appel dont elle parle. Un échec termine le tour de l'éditeur avec son erreur.
+   * Starts each question and each delegated tool once, and counts what is in progress. A request
+   * leaves only after the notifications that precede it, so that the editor already knows the
+   * call it is about. A failure ends the editor's turn with its error.
    */
   const act = (
     editor: acp.AgentContext,
@@ -552,7 +548,7 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
 
   const sessionOf = (sessionId: string) => {
     const session = sessions.get(sessionId)
-    if (!session) throw new acp.RequestError(-32602, `session inconnue : ${sessionId}`)
+    if (!session) throw new acp.RequestError(-32602, `unknown session: ${sessionId}`)
     return session
   }
 
@@ -585,7 +581,7 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
     })
     .onRequest('session/load', async ({ params, client: editor }) => {
       const session = await open(params.sessionId, params)
-      // L'historique est rejoué à l'éditeur, puis la session reprend comme une nouvelle.
+      // The history is replayed to the editor, then the session resumes like a new one.
       report(editor, session, client.view(session.conversationId), true)
       await chain
       return {}
@@ -594,7 +590,7 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
       const session = sessionOf(params.sessionId)
       const id = session.conversationId
       session.cancelled = false
-      // Ce qui précède ce message est déjà connu de l'éditeur.
+      // What precedes this message is already known to the editor.
       report(editor, session, client.view(id), true)
       await chain
       await client.send(id, toParts(params.prompt))
@@ -617,9 +613,9 @@ export function acpAgent(options: AcpOptions): acp.AgentApp {
           if (view.running) sawRunning = true
           report(editor, session, view, false)
           act(editor, session, view, check)
-          // Entre deux tours d'un même message (après un résultat ou une approbation), le serveur
-          // ne tourne plus mais le journal attend encore sa suite : seul le repos du journal, ou
-          // une erreur du tour, termine le message de l'éditeur.
+          // Between two turns of the same message (after a result or an approval), the server is
+          // no longer running but the journal still waits for what follows: only the journal at
+          // rest, or an error of the turn, ends the editor's message.
           const idle =
             sawRunning &&
             !view.running &&

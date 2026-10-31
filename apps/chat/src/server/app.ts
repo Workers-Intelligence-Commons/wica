@@ -1,7 +1,7 @@
-// Serveur du chat : les routes HTTP de l'application autour du serveur du Harness embarqué.
-// Chaque commande du navigateur est déposée dans `commands` ; une conversation du serveur
-// embarqué la traite dans la requête par un tour court, puis la suite part en réveil. Une
-// conversation d'un serveur distant attend que celui-ci la lise dans sa boîte de commandes.
+// Chat server: the HTTP routes of the application around the embedded Harness server. Each
+// browser command is placed in `commands`; a conversation of the embedded server processes it in
+// the request with a short turn, then the rest leaves as a wake-up. A conversation of a remote
+// server waits for that server to read it from its command inbox.
 
 import { dispatchStoreCall, isStoreCall, callConversation } from '@wica/chat-remote'
 import type { Envelope } from '@wica/protocol'
@@ -52,16 +52,16 @@ import { PgStore } from './store.ts'
 
 export type Platform = {
   scheduler: Scheduler
-  /** Adresse de la connexion entrante, pour le proxy de confiance. */
+  /** Address of the incoming connection, for the trusted proxy. */
   clientAddress: (req: Request) => string | undefined
-  /** Budget d'un tour avant de rendre la main et de demander une reprise. */
+  /** Budget of a turn before handing back control and asking for a resume. */
   turnBudgetMs?: number
 }
 
 const INSTRUCTIONS =
   'You are the assistant of a chat. Answer the person in the conversation, and ask your questions with ask_user. You have no access to the file system or to a terminal.'
 
-/** Le serveur embarqué n'a que des outils sans accès au système : ils passent sans demande. */
+/** The embedded server has only tools without system access: they pass without a request. */
 const chatAuthorize: Authorize = (call) =>
   !isDestructive(call.annotations) && !isOpenWorld(call.annotations)
     ? 'allow'
@@ -80,7 +80,7 @@ const OIDC_COOKIE = 'wica_oidc'
 
 type ConversationRow = { owner_id: string | null; server_id: string | null; model: string | null }
 
-/** Le modèle introuvable n'arrête pas l'écriture de la commande ; le tour long le signale. */
+/** A model that cannot be found does not stop the command from being written; the long turn reports it. */
 const unavailableModel = (message: string): ModelAdapter => ({
   stream: () => ({
     [Symbol.asyncIterator]: () => ({ next: () => Promise.reject(new Error(message)) }),
@@ -107,10 +107,10 @@ export function chatServer(config: ChatConfig, sql: postgres.Sql, platform: Plat
     sessionSecret: config.sessionSecret,
     ...(adapter ? { adapter } : {}),
   })
-  // Le jeton d'admin reste valable dans tous les modes, pour créer les premiers comptes.
+  // The admin token stays valid in every mode, to create the first accounts.
   const admin = config.adminToken ? bootstrapAuth(config.adminToken) : undefined
 
-  /** Le serveur embarqué reconnaît le jeton court qu'une requête de commande lui donne. */
+  /** The embedded server recognizes the short token that a command request gives it. */
   const clientAuth: ClientAuth = {
     async authenticate({ token }) {
       const claims = token
@@ -155,7 +155,7 @@ export function chatServer(config: ChatConfig, sql: postgres.Sql, platform: Plat
     })
   }
 
-  /** Réveil planifié d'une conversation : son tour suivant, sur le serveur embarqué. */
+  /** Scheduled wake-up of a conversation: its next turn, on the embedded server. */
   async function wake(conversationId: string) {
     const [row] = await sql<ConversationRow[]>`
       SELECT owner_id, server_id, model FROM conversations WHERE id = ${conversationId}`
@@ -184,7 +184,7 @@ export function chatServer(config: ChatConfig, sql: postgres.Sql, platform: Plat
         { signal: req.signal },
       )
     } catch {
-      // Un client parti ferme sa requête en attente : ce n'est pas une panne.
+      // A client that left closes its pending request: this is not a failure.
       if (req.signal.aborted) return new Response(null, { status: 499 })
       return error(502, 'sync unavailable')
     }
@@ -279,7 +279,7 @@ export function chatServer(config: ChatConfig, sql: postgres.Sql, platform: Plat
     if (!row) return error(404, 'conversation not found')
     await sql.begin(async (tx) => {
       await tx`DELETE FROM conversations WHERE id = ${conversationId}`
-      // Ramasse-miettes : un blob qu'aucun élément ne référence plus est libéré.
+      // Garbage collection: a blob that no item references anymore is freed.
       await tx`
         DELETE FROM blobs b WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.blob_sha256 = b.sha256)`
     })
@@ -391,7 +391,7 @@ export function chatServer(config: ChatConfig, sql: postgres.Sql, platform: Plat
             new Request(req.url, { headers: { authorization: `Bearer ${body.key}` } }),
           )
         : null
-      // Seule une clé d'un compte ouvre une session de navigateur.
+      // Only an account key opens a browser session.
       if (!principal || principal.id === 'admin' || !(await repo.principal(principal.id))) {
         return error(401, 'key refused')
       }
@@ -448,7 +448,7 @@ export function chatServer(config: ChatConfig, sql: postgres.Sql, platform: Plat
     return error(404, 'unknown route')
   }
 
-  /** Routes `/api/*` et `/auth/*` ; `null` pour toute autre adresse. */
+  /** `/api/*` and `/auth/*` routes; `null` for any other address. */
   async function handle(req: Request): Promise<Response | null> {
     const url = new URL(req.url)
     const parts = url.pathname.split('/').filter(Boolean)
@@ -461,10 +461,10 @@ export function chatServer(config: ChatConfig, sql: postgres.Sql, platform: Plat
     if (section === 'admin' && rest[0] === 'users' && req.method === 'POST') {
       if (!principal.scopes.includes('admin')) return error(403, 'admin only')
       const body = (await req.json()) as { name?: string }
-      const userId = await repo.createUser(body.name?.trim() || 'Compte')
+      const userId = await repo.createUser(body.name?.trim() || 'Account')
       return json({ userId, apiKey: await repo.createApiKey({ userId }, ['chat']) }, 201)
     }
-    // L'admin ne fait que créer des comptes ; une clé d'organisation n'a pas de conversations.
+    // The admin only creates accounts; an organization key has no conversations.
     if (
       principal.id === 'admin' ||
       (principal.kind !== 'user' && !(await repo.principal(principal.id)))
@@ -492,7 +492,7 @@ export function chatServer(config: ChatConfig, sql: postgres.Sql, platform: Plat
     }
     if (section === 'servers' && rest.length === 0 && req.method === 'POST') {
       const body = (await req.json()) as { name?: string }
-      return json(await createServer(sql, principal.id, body.name?.trim() || 'Serveur'), 201)
+      return json(await createServer(sql, principal.id, body.name?.trim() || 'Server'), 201)
     }
     if (section === 'servers' && rest[0] && req.method === 'DELETE') {
       await sql`
@@ -505,10 +505,10 @@ export function chatServer(config: ChatConfig, sql: postgres.Sql, platform: Plat
     return error(404, 'unknown route')
   }
 
-  /** Compte de la requête, pour les pages ; `null` hors session. */
+  /** Account of the request, for the pages; `null` outside a session. */
   async function me(req: Request) {
     const principal = await auth.authenticate(req)
-    // Une clé d'organisation n'a pas de ligne dans `users` : elle reste sans compte.
+    // An organization key has no row in `users`: it stays without an account.
     if (!principal || principal.id === 'admin') return null
     const [user] = await sql<{ id: string; display_name: string }[]>`
       SELECT id, display_name FROM users WHERE id = ${principal.id}`

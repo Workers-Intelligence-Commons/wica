@@ -1,6 +1,6 @@
-// Liaison React du client : la vue d'une
-// conversation comme état React, et ses commandes. Ni synchro ni rendu propres : tout vient de
-// `@wica/client`, que l'application crée avec son transport.
+// React binding of the client: the view of a conversation as React state, and its commands. No
+// sync or rendering of its own: everything comes from `@wica/client`, which the application
+// creates with its transport.
 
 import type { Client, ConversationView } from '@wica/client'
 import type { Part } from '@wica/core'
@@ -15,9 +15,9 @@ import {
 } from 'react'
 
 /**
- * La vue d'une conversation pour `useSyncExternalStore`, qui exige la même valeur tant que rien
- * ne change : `client.view` en construit une nouvelle à chaque appel, elle est donc gardée entre
- * deux changements. Sans abonné, rien n'est gardé, pour ne jamais rendre une vue périmée.
+ * The view of a conversation for `useSyncExternalStore`, which requires the same value as long as
+ * nothing changes: `client.view` builds a new one at each call, so it is kept between two
+ * changes. Without a subscriber, nothing is kept, so that a stale view is never returned.
  */
 export function conversationStore(client: Client, conversationId: string) {
   let snapshot: ConversationView | null = null
@@ -41,7 +41,7 @@ export function conversationStore(client: Client, conversationId: string) {
   }
 }
 
-/** Les commandes du client, liées à une conversation. */
+/** The client commands, bound to a conversation. */
 export const conversationCommands = (client: Client, conversationId: string) => ({
   send: (parts: Part[] | string, parentId?: string | null) =>
     client.send(conversationId, parts, parentId),
@@ -53,18 +53,18 @@ export const conversationCommands = (client: Client, conversationId: string) => 
 
 const ClientContext = createContext<Client | null>(null)
 
-/** Donne le client aux composants de l'arbre. */
+/** Gives the client to the components of the tree. */
 export function WicaProvider(props: { client: Client; children?: ReactNode }) {
   return createElement(ClientContext.Provider, { value: props.client }, props.children)
 }
 
 export function useWicaClient(): Client {
   const client = useContext(ClientContext)
-  if (!client) throw new Error('useWicaClient demande un WicaProvider plus haut dans l’arbre.')
+  if (!client) throw new Error('useWicaClient needs a WicaProvider higher in the tree.')
   return client
 }
 
-/** S'abonne à la conversation et rend sa vue, à jour à chaque changement, et ses commandes. */
+/** Subscribes to the conversation and returns its view, up to date at each change, and its commands. */
 export function useConversation(conversationId: string) {
   const client = useWicaClient()
   const store = useMemo(() => conversationStore(client, conversationId), [client, conversationId])

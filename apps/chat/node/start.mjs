@@ -1,7 +1,7 @@
-// Démarrage du Compose : sert les fichiers du client, passe le reste au serveur compilé, et lance
-// la boucle des réveils. L'adresse du client remplace tout en-tête du même nom envoyé par le client,
-// pour le proxy de confiance. Derrière Caddy, la connexion entrante vient toujours de Caddy : la
-// dernière adresse de `X-Forwarded-For` est celle qu'il a vue, et il écrase celles de son client.
+// Compose startup: serves the client files, passes the rest to the compiled server, and starts
+// the wake-up loop. The client address replaces any header of the same name sent by the client,
+// for the trusted proxy. Behind Caddy, the incoming connection always comes from Caddy: the last
+// address in `X-Forwarded-For` is the one it saw, and it overwrites those of its client.
 
 import { serve } from 'srvx'
 import { staticMiddleware } from 'srvx/static'
@@ -25,8 +25,8 @@ const server = serve({
     headers.delete('x-wica-client-address')
     const address = clientAddress(request)
     if (address) headers.set('x-wica-client-address', address)
-    // La requête de srvx sous Node n'est pas une `Request` que undici sait copier : elle est
-    // reconstruite à partir de ses parties.
+    // The srvx request under Node is not a `Request` that undici can copy: it is rebuilt from
+    // its parts.
     const hasBody = request.method !== 'GET' && request.method !== 'HEAD'
     return app.fetch(
       new Request(request.url, {

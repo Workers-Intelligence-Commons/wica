@@ -1,5 +1,5 @@
-// Compte de la page, connu avant l'hydratation : il nomme les fichiers du cache local et sert de
-// `author` aux messages. Le serveur le lit dans la requête, le navigateur le demande une fois.
+// Account of the page, known before hydration: it names the local cache files and serves as the
+// `author` of messages. The server reads it from the request, the browser asks for it once.
 
 import { createIsomorphicFn } from '@tanstack/react-start'
 
@@ -22,7 +22,7 @@ export const getMe = createIsomorphicFn()
   })
   .client(loadBrowserMe)
 
-/** Déconnexion : le cache du compte est vidé au prochain chargement, avant toute ouverture. */
+/** Logout: the account cache is cleared on the next load, before anything opens. */
 export async function logout(account: string) {
   localStorage.setItem('wica-clear-account', account)
   await fetch('/auth/logout', { method: 'POST' })

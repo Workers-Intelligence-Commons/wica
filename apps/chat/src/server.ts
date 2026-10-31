@@ -1,6 +1,6 @@
-// Entrée du serveur, la même pour le Compose et pour Workers : les routes de l'API et de
-// connexion d'abord, puis le rendu de TanStack Start. `#platform` choisit, à la compilation,
-// l'implémentation de Node ou celle de Workers.
+// Server entry point, the same for Compose and for Workers: the API and login routes first, then
+// TanStack Start rendering. `#platform` chooses, at build time, the Node implementation or the
+// Workers one.
 
 import handler, { createServerEntry } from '@tanstack/react-start/server-entry'
 import { queue, startBackground, withChat } from '#platform'

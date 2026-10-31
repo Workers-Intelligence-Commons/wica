@@ -31,7 +31,7 @@ const tools: ToolSpec[] = [
   },
 ]
 
-/** Journal écrit à la main : chaque élément suit le précédent, sauf parent donné. */
+/** Hand-written journal: each item follows the previous one, unless a parent is given. */
 function journal() {
   const items: Item[] = []
   const add = (id: string, body: ItemBody, o: { parent?: string | null; at?: string } = {}) => {
@@ -63,7 +63,7 @@ const said = (text: string): ItemBody => ({ kind: 'assistant_text', text, audien
 const ms = (iso: string) => Date.parse(iso)
 
 describe('parseDuration', () => {
-  it('lit les jours, heures, minutes et secondes, et refuse le reste', () => {
+  it('reads days, hours, minutes and seconds, and refuses the rest', () => {
     expect(parseDuration('PT15M')).toBe(15 * 60_000)
     expect(parseDuration('P1DT2H')).toBe(26 * 3_600_000)
     expect(parseDuration('PT0.5S')).toBe(500)
@@ -72,8 +72,8 @@ describe('parseDuration', () => {
 })
 
 describe('planWakeups', () => {
-  // Une machine endormie pendant plusieurs occurrences ne déclenche qu'un réveil, le plus récent.
-  it('déclenche une seule occurrence manquée et annonce la suivante', () => {
+  // A machine asleep during several occurrences fires only one wake-up, the most recent one.
+  it('fires a single missed occurrence and announces the next one', () => {
     const j = journal()
     j.add('s', scheduled('w', '2026-10-30T10:00:00.000Z', 'PT1H'))
     const plan = planWakeups(j.items, 's', tools, ms('2026-10-30T12:30:00.000Z'))
@@ -88,14 +88,14 @@ describe('planWakeups', () => {
     })
   })
 
-  it('ignore un réveil annulé', () => {
+  it('ignores a cancelled wake-up', () => {
     const j = journal()
     j.add('s', scheduled('w', '2026-10-30T10:00:00.000Z'))
     j.add('c', { kind: 'event', name: 'wakeup_cancelled', data: { id: 'w' } })
     expect(planWakeups(j.items, 'c', tools, ms('2026-10-30T11:00:00.000Z'))).toEqual({})
   })
 
-  it('fait attendre un réveil au-delà du plafond jusqu’à la fin de la période', () => {
+  it('makes a wake-up beyond the cap wait until the end of the period', () => {
     const j = journal()
     j.add('s1', scheduled('a', '2026-10-30T12:00:00.000Z'))
     j.add('f1', fired('a', '2026-10-30T12:00:00.000Z'))
@@ -111,7 +111,7 @@ describe('planWakeups', () => {
 describe('wakeupsPaused', () => {
   const loop = (texts: string[]) => {
     const j = journal()
-    j.add('m', { kind: 'user_message', parts: [{ type: 'text', text: 'Surveille' }] })
+    j.add('m', { kind: 'user_message', parts: [{ type: 'text', text: 'Watch' }] })
     texts.forEach((text, n) => {
       j.add(`f${n}`, fired('w', `2026-10-30T1${n}:00:00.000Z`))
       j.add(`t${n}`, said(text))
@@ -119,23 +119,23 @@ describe('wakeupsPaused', () => {
     return j
   }
 
-  it('met en pause après trois réveils de suite qui répètent la même chose', () => {
-    const j = loop(['Rien de neuf.', 'Rien de neuf.', 'Rien de neuf.', 'Rien de neuf.'])
+  it('pauses after three consecutive wake-ups that repeat the same thing', () => {
+    const j = loop(['Nothing new.', 'Nothing new.', 'Nothing new.', 'Nothing new.'])
     expect(wakeupsPaused(j.items, tools)).toBe(true)
   })
 
-  it('ne met pas en pause quand un réveil apporte du nouveau, ou après un message', () => {
+  it('does not pause when a wake-up brings something new, or after a message', () => {
     expect(
-      wakeupsPaused(loop(['Rien.', 'Rien.', 'Rien.', 'Un courriel est arrivé.']).items, tools),
+      wakeupsPaused(loop(['Nothing.', 'Nothing.', 'Nothing.', 'An email arrived.']).items, tools),
     ).toBe(false)
-    const j = loop(['Rien.', 'Rien.', 'Rien.', 'Rien.'])
+    const j = loop(['Nothing.', 'Nothing.', 'Nothing.', 'Nothing.'])
     j.add('m2', { kind: 'user_message', parts: [{ type: 'text', text: 'Continue' }] })
     expect(wakeupsPaused(j.items, tools)).toBe(false)
   })
 })
 
 describe('wakeupBudgetExceeded', () => {
-  it('compte les appels au modèle depuis le réveil', () => {
+  it('counts the model calls since the wake-up', () => {
     const j = journal()
     j.add('f', fired('w', '2026-10-30T10:00:00.000Z'))
     j.add('c1', {
@@ -167,12 +167,12 @@ describe('wakeupBudgetExceeded', () => {
 })
 
 describe('actedElsewhere', () => {
-  // Branche A : une écriture a eu lieu. La personne édite son message : la branche B l'ignore.
+  // Branch A: a write took place. The person edits their message: branch B ignores it.
   const branches = () => {
     const j = journal()
     j.add(
       'm1',
-      { kind: 'user_message', parts: [{ type: 'text', text: 'Écris' }] },
+      { kind: 'user_message', parts: [{ type: 'text', text: 'Write' }] },
       { parent: null },
     )
     j.add('w', {
@@ -191,11 +191,11 @@ describe('actedElsewhere', () => {
       channel: 'environment',
     })
     j.add('rr', { kind: 'tool_result', callId: 'r1', output: [] })
-    j.add('m2', { kind: 'user_message', parts: [{ type: 'text', text: 'Lis' }] }, { parent: null })
+    j.add('m2', { kind: 'user_message', parts: [{ type: 'text', text: 'Read' }] }, { parent: null })
     return j
   }
 
-  it('signale une seule fois les outils qui ont agi sur une autre branche', () => {
+  it('reports only once the tools that acted on another branch', () => {
     const j = branches()
     expect(actedElsewhere(j.items, 'm2', tools)).toEqual({ ancestor: null, callIds: ['w1'] })
     j.add('b', { kind: 'event', name: 'branch_resumed', data: { ancestor: null, callIds: ['w1'] } })
@@ -205,7 +205,7 @@ describe('actedElsewhere', () => {
 
 type Body = Event extends infer E ? (E extends unknown ? Omit<E, 'at'> : never) : never
 
-/** Hôte minimal à horloge réglable : accuse chaque `persist` et collecte les intentions. */
+/** Minimal host with an adjustable clock: acknowledges each `persist` and collects the intents. */
 function host(policy: State['policy'] = { freeText: 'direct' }) {
   let state = initialState({ conversationId: 'c', salt: 's', policy })
   let seq = 0
@@ -236,10 +236,10 @@ function host(policy: State['policy'] = { freeText: 'direct' }) {
   }
 }
 
-describe('step : réveils et échéances', () => {
-  it('prévoit un réveil par l’outil schedule, puis le déclenche seul à son heure', () => {
+describe('step: wake-ups and deadlines', () => {
+  it('schedules a wake-up through the schedule tool, then fires it on its own at its time', () => {
     const h = host()
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Rappelle-moi' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Remind me' }] })
     h.send({ t: 'resume' })
     h.send({
       t: 'model_done',
@@ -249,7 +249,7 @@ describe('step : réveils et échéances', () => {
             type: 'tool_call',
             callId: 's1',
             tool: 'schedule',
-            input: { inSeconds: 60, payload: 'relever la boîte' },
+            input: { inSeconds: 60, payload: 'check the inbox' },
           },
         ],
       },
@@ -259,9 +259,9 @@ describe('step : réveils et échéances', () => {
       { t: 'schedule', at: '2026-10-30T10:01:00.000Z' },
     ])
     h.send({ t: 'resume' })
-    h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Entendu.' }] } })
+    h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Understood.' }] } })
 
-    // Trop tôt : rien ne part, l'heure du réveil est redemandée.
+    // Too early: nothing leaves, the wake-up time is requested again.
     h.at('2026-10-30T10:00:30.000Z')
     expect(h.send({ t: 'resume' })).toEqual([{ t: 'schedule', at: '2026-10-30T10:01:00.000Z' }])
     h.at('2026-10-30T10:01:00.000Z')
@@ -270,17 +270,17 @@ describe('step : réveils et échéances', () => {
     expect(pathTo(h.state.items, h.state.head).at(-1)).toMatchObject({
       kind: 'event',
       name: 'wakeup_fired',
-      data: { id: 's1', payload: 'relever la boîte' },
+      data: { id: 's1', payload: 'check the inbox' },
     })
-    // Un réveil livré deux fois ne se déclenche qu'une fois.
-    h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Rien de neuf.' }] } })
+    // A wake-up delivered twice fires only once.
+    h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Nothing new.' }] } })
     expect(h.send({ t: 'resume' })).toEqual([])
     expect(journalViolations(h.state.items)).toEqual([])
   })
 
-  it('refuse une approbation restée sans réponse à son échéance', () => {
+  it('refuses an approval left unanswered at its deadline', () => {
     const h = host({ freeText: 'direct', approvalTimeoutMs: 60_000 })
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Écris' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Write' }] })
     h.send({ t: 'resume' })
     h.send({
       t: 'model_done',
@@ -289,7 +289,7 @@ describe('step : réveils et échéances', () => {
     h.send({
       t: 'approval_needed',
       callId: 'w1',
-      question: 'Autoriser ?',
+      question: 'Allow?',
       to: { channel: 'telephone' },
     })
     expect(h.send({ t: 'resume' })).toEqual([
@@ -311,18 +311,18 @@ describe('step : réveils et échéances', () => {
   })
 })
 
-describe('step : compaction', () => {
-  it('résume le passé avant l’échange en cours, puis appelle le modèle sur la vue compactée', () => {
+describe('step: compaction', () => {
+  it('summarizes the past before the current exchange, then calls the model on the compacted view', () => {
     const h = host({ freeText: 'direct', compaction: { maxChars: 40 } })
     h.send({
       t: 'user_message',
       parentId: null,
-      parts: [{ type: 'text', text: 'Une longue première demande, bien détaillée.' }],
+      parts: [{ type: 'text', text: 'A long first request, with plenty of detail.' }],
     })
     h.send({ t: 'resume' })
-    h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Fait.' }] } })
+    h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Done.' }] } })
     const before = h.state.head
-    h.send({ t: 'user_message', parentId: before, parts: [{ type: 'text', text: 'Et ensuite ?' }] })
+    h.send({ t: 'user_message', parentId: before, parts: [{ type: 'text', text: 'And then?' }] })
 
     const [request] = h.send({ t: 'resume' }).filter((i) => i.t === 'call_model')
     expect(request?.t === 'call_model' && request.request).toMatchObject({
@@ -333,13 +333,13 @@ describe('step : compaction', () => {
       t: 'compacted',
       from: h.state.items[0]?.id ?? '',
       to: before ?? '',
-      summary: 'Demande faite.',
+      summary: 'Request handled.',
     })
 
     const [answer] = h.send({ t: 'resume' }).filter((i) => i.t === 'call_model')
     expect(answer?.t === 'call_model' && answer.request.summarize).toBeUndefined()
     const view = compactPath(answer?.t === 'call_model' ? answer.request.path : [])
-    expect(view[0]).toEqual({ kind: 'summary', text: 'Demande faite.' })
+    expect(view[0]).toEqual({ kind: 'summary', text: 'Request handled.' })
     expect(journalViolations(h.state.items)).toEqual([])
   })
 })

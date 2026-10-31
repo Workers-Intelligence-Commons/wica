@@ -1,5 +1,5 @@
-// Connexion : par clé d'API en mode d'amorçage, par l'émetteur OIDC sinon. Derrière un proxy de
-// confiance, la page n'est jamais atteinte : le proxy a déjà authentifié la personne.
+// Login: by API key in bootstrap mode, by the OIDC issuer otherwise. Behind a trusted proxy, the
+// page is never reached: the proxy has already authenticated the person.
 
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import {

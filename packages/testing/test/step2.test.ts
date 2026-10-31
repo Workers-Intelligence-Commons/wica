@@ -1,5 +1,5 @@
-// Porte de l'étape 2 : topologie tout-local, un seul
-// processus ; un agent mène une tâche sur des fichiers de bout en bout, avec approbations.
+// Step 2 gate: all-local topology, a single process; an agent carries out a task on files from
+// end to end, with approvals.
 
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -15,20 +15,20 @@ import { describe, expect, it } from 'vite-plus/test'
 import { scriptedModel } from '../src/index.ts'
 
 const askForWrites: Authorize = (call) =>
-  call.annotations.readOnlyHint ? 'allow' : { ask: `Autoriser ${call.tool} ?` }
+  call.annotations.readOnlyHint ? 'allow' : { ask: `Allow ${call.tool}?` }
 
-// Le modèle lit notes.txt, l'écrit dans todo.txt, puis conclut ; il s'adapte à un refus.
+// The model reads notes.txt, writes it into todo.txt, then concludes; it adapts to a refusal.
 const copyModel = () =>
   scriptedModel((request) => {
     const last = request.path.findLast((i) => i.kind !== 'event')
     const results = request.path.filter((i) => i.kind === 'tool_result')
     if (last?.kind === 'tool_result' && last.isError) {
-      return { parts: [{ type: 'text', text: "D'accord, je n'écris rien." }] }
+      return { parts: [{ type: 'text', text: 'OK, I write nothing.' }] }
     }
     if (results.length === 0) {
       return {
         parts: [
-          { type: 'text', text: 'Je lis le fichier.' },
+          { type: 'text', text: 'Reading the file.' },
           { type: 'tool_call', callId: 'k1', tool: 'read_file', input: { path: 'notes.txt' } },
         ],
       }
@@ -47,12 +47,12 @@ const copyModel = () =>
         ],
       }
     }
-    return { parts: [{ type: 'text', text: "C'est fait." }] }
+    return { parts: [{ type: 'text', text: 'Done.' }] }
   })
 
 async function setup(model: ModelAdapter, authorize: Authorize) {
   const dir = await mkdtemp(join(tmpdir(), 'wica-step2-'))
-  await writeFile(join(dir, 'notes.txt'), 'acheter du pain')
+  await writeFile(join(dir, 'notes.txt'), 'buy bread')
   const harness = createHarness({ model, tools: nodeTools({ roots: [dir] }), authorize })
   const { client: clientEnd, server } = memoryTransportPair()
   void harness.serve(server)
@@ -64,7 +64,7 @@ async function setup(model: ModelAdapter, authorize: Authorize) {
 
 function waitFor(client: Client, conversationId: string, ready: () => boolean): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('délai dépassé')), 2000)
+    const timer = setTimeout(() => reject(new Error('timed out')), 2000)
     const check = () => {
       if (!ready()) return
       clearTimeout(timer)
@@ -83,21 +83,21 @@ const finalText = (client: Client) =>
     .map((e) => (e.type === 'assistant' ? e.text : ''))
     .at(-1)
 
-describe('étape 2', () => {
-  it("mène la tâche de bout en bout quand la personne accorde l'écriture", async () => {
+describe('step 2', () => {
+  it('carries out the task from end to end when the person grants the write', async () => {
     const { dir, harness, client } = await setup(copyModel(), askForWrites)
-    await client.send('c1', 'Copie notes.txt dans todo.txt')
+    await client.send('c1', 'Copy notes.txt into todo.txt')
 
     await waitFor(client, 'c1', () => client.view('c1').waiting.length > 0)
     const [question] = client.view('c1').waiting
     expect(question).toMatchObject({
       tool: 'approve',
-      input: { question: 'Autoriser write_file ?' },
+      input: { question: 'Allow write_file?' },
     })
     await client.answer('c1', question!.callId, true)
 
-    await waitFor(client, 'c1', () => finalText(client) === "C'est fait.")
-    expect(await readFile(join(dir, 'todo.txt'), 'utf8')).toBe('acheter du pain')
+    await waitFor(client, 'c1', () => finalText(client) === 'Done.')
+    expect(await readFile(join(dir, 'todo.txt'), 'utf8')).toBe('buy bread')
     const view = client.view('c1')
     expect(view.entries.map((e) => e.type)).toEqual([
       'user',
@@ -114,13 +114,13 @@ describe('étape 2', () => {
     await client.close()
   })
 
-  it("n'écrit rien quand la personne refuse, et le modèle reçoit le refus", async () => {
+  it('writes nothing when the person refuses, and the model receives the refusal', async () => {
     const { dir, harness, client } = await setup(copyModel(), askForWrites)
-    await client.send('c1', 'Copie notes.txt dans todo.txt')
+    await client.send('c1', 'Copy notes.txt into todo.txt')
     await waitFor(client, 'c1', () => client.view('c1').waiting.length > 0)
     await client.answer('c1', client.view('c1').waiting[0]!.callId, false)
 
-    await waitFor(client, 'c1', () => finalText(client) === "D'accord, je n'écris rien.")
+    await waitFor(client, 'c1', () => finalText(client) === 'OK, I write nothing.')
     await expect(readFile(join(dir, 'todo.txt'), 'utf8')).rejects.toThrow()
     const items = (await harness.store.load('c1', 0)).items
     expect(items.find((i) => i.kind === 'tool_result' && i.callId === 'k2')).toMatchObject({
@@ -130,10 +130,10 @@ describe('étape 2', () => {
     await client.close()
   })
 
-  it('refuse un chemin hors du dossier autorisé, même quand tout est autorisé', async () => {
+  it('refuses a path outside the allowed folder, even when everything is allowed', async () => {
     const model = scriptedModel((request) =>
       request.path.some((i) => i.kind === 'tool_result')
-        ? { parts: [{ type: 'text', text: 'Fin.' }] }
+        ? { parts: [{ type: 'text', text: 'End.' }] }
         : {
             parts: [
               {
@@ -146,26 +146,26 @@ describe('étape 2', () => {
           },
     )
     const { harness, client } = await setup(model, allowAll)
-    await client.send('c1', 'Lis /etc/passwd')
-    await waitFor(client, 'c1', () => finalText(client) === 'Fin.')
+    await client.send('c1', 'Read /etc/passwd')
+    await waitFor(client, 'c1', () => finalText(client) === 'End.')
     const result = (await harness.store.load('c1', 0)).items.find((i) => i.kind === 'tool_result')
     expect(result).toMatchObject({ isError: true })
     expect(result?.kind === 'tool_result' && result.output[0]).toMatchObject({
-      text: expect.stringContaining('Accès refusé'),
+      text: expect.stringContaining('Access denied'),
     })
     await client.close()
   })
 
-  it('harness.run reste ouvert pendant la question, puis se termine après la réponse', async () => {
+  it('harness.run stays open during the question, then ends after the answer', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'wica-step2-'))
-    await writeFile(join(dir, 'notes.txt'), 'acheter du pain')
+    await writeFile(join(dir, 'notes.txt'), 'buy bread')
     const harness = createHarness({
       model: copyModel(),
       tools: nodeTools({ roots: [dir] }),
       authorize: askForWrites,
     })
     const seen: string[] = []
-    for await (const event of harness.run('Copie notes.txt dans todo.txt', {
+    for await (const event of harness.run('Copy notes.txt into todo.txt', {
       conversationId: 'r1',
     })) {
       seen.push(event.type)
@@ -173,6 +173,6 @@ describe('étape 2', () => {
     }
     expect(seen).toContain('question')
     expect(seen.at(-1)).toBe('done')
-    expect(await readFile(join(dir, 'todo.txt'), 'utf8')).toBe('acheter du pain')
+    expect(await readFile(join(dir, 'todo.txt'), 'utf8')).toBe('buy bread')
   })
 })

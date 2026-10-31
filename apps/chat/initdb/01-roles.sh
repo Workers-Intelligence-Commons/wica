@@ -1,7 +1,7 @@
 #!/bin/sh
-# Premier démarrage de Postgres (répertoire de données vide) : la base `chat` et ses deux rôles.
-# `chat_app` est l'application ; `electric` lit le journal de réplication et ne fait que lire.
-# La base `auth` n'existe que dans le déploiement de référence, avec un service d'auth séparé.
+# First Postgres start (empty data directory): the `chat` database and its two roles.
+# `chat_app` is the application; `electric` reads the replication journal and only reads.
+# The `auth` database exists only in the reference deployment, with a separate auth service.
 set -eu
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \

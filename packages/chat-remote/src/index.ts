@@ -1,14 +1,14 @@
-// Serveur distant du chat : un serveur du Harness sur la machine d'une personne, ou dans un bac
-// à sable, qui sert les conversations du chat. Il écrit par le `Store` du chat en HTTP et suit
-// sa boîte de commandes par une shape Electric servie par le proxy du chat. Les deux côtés de
-// l'API (appel et répartition) sont ici, pour qu'ils ne divergent pas.
+// Remote server of the chat: a Harness server on a person's machine, or in a sandbox, that serves
+// the chat conversations. It writes through the chat `Store` over HTTP and follows its command
+// inbox through an Electric shape served by the chat proxy. Both sides of the API (call and
+// dispatch) are here, so that they do not diverge.
 
 import { type Message, type Offset, ShapeStream } from '@electric-sql/client'
 import type { Envelope } from '@wica/protocol'
 import { StaleEpochError, type Store } from '@wica/runtime'
 import type { CommandInbox, InboxAck, InboxEntry } from '@wica/transport-inbox'
 
-/** Méthodes du `Store` appelables à distance. */
+/** `Store` methods that can be called remotely. */
 export const STORE_METHODS = [
   'claim',
   'renew',
@@ -37,11 +37,11 @@ export const isStoreCall = (body: unknown): body is StoreCall =>
   (STORE_METHODS as readonly string[]).includes((body as StoreCall).method) &&
   Array.isArray((body as StoreCall).args)
 
-/** Conversation visée par un appel : toutes les méthodes la prennent en premier argument. */
+/** Conversation targeted by a call: every method takes it as its first argument. */
 export const callConversation = (call: StoreCall) =>
   typeof call.args[0] === 'string' ? call.args[0] : null
 
-/** Côté chat : exécute l'appel sur le `Store` ; un `epoch` périmé devient une réponse, pas une panne. */
+/** Chat side: runs the call on the `Store`; a stale `epoch` becomes a response, not a failure. */
 export async function dispatchStoreCall(store: Store, call: StoreCall): Promise<StoreReply> {
   try {
     const method = store[call.method] as (...args: unknown[]) => Promise<unknown>
@@ -54,14 +54,14 @@ export async function dispatchStoreCall(store: Store, call: StoreCall): Promise<
 }
 
 export type RemoteOptions = {
-  /** Adresse du chat, par exemple `https://chat.example.org`. */
+  /** Address of the chat, for example `https://chat.example.org`. */
   url: string
-  /** Jeton du serveur, donné une fois à sa création dans le chat. */
+  /** Server token, given once when it is created in the chat. */
   token: string
   fetch?: typeof fetch
 }
 
-/** Panne passagère du chat : `resilientStore` la réessaie. */
+/** Transient failure of the chat: `resilientStore` retries it. */
 export class ChatUnavailableError extends Error {
   override name = 'ChatUnavailableError'
   readonly retryable = true
@@ -78,15 +78,15 @@ async function post(options: RemoteOptions, path: string, body: unknown): Promis
     body: JSON.stringify(body),
   })
   if (response.status >= 500 || response.status === 429) {
-    throw new ChatUnavailableError(`chat indisponible (${response.status})`)
+    throw new ChatUnavailableError(`chat unavailable (${response.status})`)
   }
   if (!response.ok) throw new ChatRefusedError(`chat : ${response.status} ${await response.text()}`)
   return response.json()
 }
 
 /**
- * `Store` du chat en HTTP. Une coupure lève une erreur de réseau ou `ChatUnavailableError`,
- * que `resilientStore` de `@wica/runtime` réessaie ; un `epoch` périmé lève `StaleEpochError`.
+ * Chat `Store` over HTTP. A disconnection raises a network error or `ChatUnavailableError`, which
+ * `resilientStore` from `@wica/runtime` retries; a stale `epoch` raises `StaleEpochError`.
  */
 export function httpStore(options: RemoteOptions): Store {
   const call =
@@ -99,7 +99,7 @@ export function httpStore(options: RemoteOptions): Store {
   return Object.fromEntries(STORE_METHODS.map((m) => [m, call(m)])) as unknown as Store
 }
 
-/** Qui est ce serveur pour le chat : son identifiant et le compte de son propriétaire. */
+/** Who this server is for the chat: its identifier and the account of its owner. */
 export async function whoami(
   options: RemoteOptions,
 ): Promise<{ serverId: string; ownerId: string }> {
@@ -108,7 +108,7 @@ export async function whoami(
 
 type CommandRow = { id: string; conversation_id: string; payload: Envelope; created_at: string }
 
-/** Curseur de la boîte : la shape et la position dans son journal. */
+/** Inbox cursor: the shape and the position in its journal. */
 const encodeCursor = (handle: string | undefined, offset: Offset) => `${handle ?? ''} ${offset}`
 const decodeCursor = (cursor: string) => {
   const [handle, offset] = cursor.split(' ')
@@ -116,9 +116,9 @@ const decodeCursor = (cursor: string) => {
 }
 
 /**
- * Boîte de commandes du chat. Sans curseur, la shape commence par les commandes sans accusé ;
- * avec un curseur, elle reprend à sa position. Le client Electric se reconnecte seul : le flux
- * ne finit que sur une erreur qu'il ne sait pas reprendre, ou à l'arrêt.
+ * Command inbox of the chat. Without a cursor, the shape starts with the commands that have no
+ * acknowledgement; with a cursor, it resumes at its position. The Electric client reconnects on
+ * its own: the stream ends only on an error it cannot recover from, or on stop.
  */
 export function chatInbox(options: RemoteOptions): CommandInbox {
   return {
@@ -135,8 +135,8 @@ export function chatInbox(options: RemoteOptions): CommandInbox {
       const queue: InboxEntry[] = []
       let failure: Error | null = null
       let wake: () => void = () => {}
-      // La position n'avance qu'après le dernier élément d'un lot : une reprise en plein lot le
-      // relit en entier, et le serveur écarte les commandes déjà traitées.
+      // The position moves forward only after the last item of a batch: a resume in the middle of
+      // a batch reads it again in full, and the server discards the commands already processed.
       let before = encodeCursor(position.handle, position.offset)
       const unsubscribe = stream.subscribe(
         (messages: Message<CommandRow>[]) => {

@@ -1,6 +1,6 @@
-// Transport WebSocket JSON. Ce fichier n'utilise que
-// l'API WebSocket standard : il sert côté serveur sur toute plateforme qui fournit un socket
-// (Workers compris) et côté client. Le serveur Node est dans `./node`.
+// JSON WebSocket transport. This file uses only the standard WebSocket API: it serves on the
+// server side on any platform that provides a socket (Workers included) and on the client side.
+// The Node server is in `./node`.
 
 import type {
   ClientFrame,
@@ -11,7 +11,7 @@ import type {
   Transport,
 } from '@wica/protocol'
 
-/** Le sous-ensemble de l'API WebSocket standard dont le transport a besoin. */
+/** The subset of the standard WebSocket API that the transport needs. */
 export interface SocketLike {
   readonly readyState: number
   send(data: string): void
@@ -63,8 +63,8 @@ const parse = (data: unknown): unknown => {
 }
 
 /**
- * Transport sur un socket déjà accepté, côté serveur. Une trame envoyée après la fermeture est
- * perdue sans erreur : le client reprend à son curseur et rejoue ses commandes.
+ * Transport over an already accepted socket, on the server side. A frame sent after closing is
+ * lost without an error: the client resumes at its cursor and replays its commands.
  */
 export function socketTransport<Out extends Frame, In extends Frame>(
   socket: SocketLike,
@@ -88,24 +88,24 @@ export function socketTransport<Out extends Frame, In extends Frame>(
   }
 }
 
-/** Côté serveur : le socket d'une connexion entrante devient un `ServerTransport`. */
+/** Server side: the socket of an incoming connection becomes a `ServerTransport`. */
 export const serveWebSocket = (socket: SocketLike): ServerTransport =>
   socketTransport<ServerFrame, ClientFrame>(socket)
 
 export type ConnectOptions = {
-  /** Constructeur WebSocket ; celui de la plateforme par défaut. */
+  /** WebSocket constructor; the platform's by default. */
   WebSocket?: new (url: string) => SocketLike
-  /** Première attente avant une reconnexion ; elle double à chaque échec. 200 ms par défaut. */
+  /** First wait before a reconnection; it doubles at each failure. 200 ms by default. */
   baseDelayMs?: number
-  /** Attente maximale entre deux tentatives. 10 s par défaut. */
+  /** Maximum wait between two attempts. 10 s by default. */
   maxDelayMs?: number
-  /** Intervalle du battement de cœur ; sans trame reçue pendant deux intervalles, on reconnecte. */
+  /** Heartbeat interval; without a frame received during two intervals, reconnect. */
   heartbeatMs?: number
 }
 
 /**
- * Côté client : un transport qui se reconnecte seul, avec une attente croissante, et signale
- * chaque reconnexion par `onReopen` pour que le client reprenne à son curseur.
+ * Client side: a transport that reconnects on its own, with a growing wait, and reports each
+ * reconnection through `onReopen` so that the client resumes at its cursor.
  */
 export function connectWebSocket(url: string, options: ConnectOptions = {}): ClientTransport {
   const Socket =
@@ -130,8 +130,8 @@ export function connectWebSocket(url: string, options: ConnectOptions = {}): Cli
     new Promise<SocketLike>((resolve, reject) => {
       const socket = new Socket(url)
       socket.addEventListener('open', () => resolve(socket))
-      socket.addEventListener('error', () => reject(new Error(`connexion impossible : ${url}`)))
-      socket.addEventListener('close', () => reject(new Error(`connexion impossible : ${url}`)))
+      socket.addEventListener('error', () => reject(new Error(`connection failed: ${url}`)))
+      socket.addEventListener('close', () => reject(new Error(`connection failed: ${url}`)))
     })
 
   const follow = (socket: SocketLike) =>
@@ -143,7 +143,7 @@ export function connectWebSocket(url: string, options: ConnectOptions = {}): Cli
         if (frame && frame.kind !== 'pong') inbox.push(frame)
       })
       const timer = setInterval(() => {
-        if (Date.now() - lastSeen > 2 * heartbeat) socket.close(4000, 'battement de cœur perdu')
+        if (Date.now() - lastSeen > 2 * heartbeat) socket.close(4000, 'heartbeat lost')
         else if (socket.readyState === OPEN) socket.send(JSON.stringify({ kind: 'ping' }))
       }, heartbeat)
       socket.addEventListener('close', () => (clearInterval(timer), resolve()))
@@ -173,8 +173,8 @@ export function connectWebSocket(url: string, options: ConnectOptions = {}): Cli
 
   return {
     async send(frame) {
-      // Une trame attend une connexion ouverte ; perdue si la connexion tombe pendant l'envoi,
-      // elle est rejouée par le client à la reconnexion.
+      // A frame waits for an open connection; lost if the connection drops during the send, it
+      // is replayed by the client at reconnection.
       while (!current || current.readyState !== OPEN) {
         if (stop.signal.aborted) return
         await opened

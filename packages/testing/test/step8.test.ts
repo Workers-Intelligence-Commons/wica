@@ -1,6 +1,6 @@
-// Porte de l'étape 8 : une session ACP pilote le même
-// cœur que le web et le CLI. L'éditeur est simulé dans le processus par le SDK ACP : il fournit
-// ses fichiers comme outils, répond à l'approbation, et un client web voit la même conversation.
+// Step 8 gate: an ACP session drives the same core as the web and the CLI. The editor is
+// simulated in the process by the ACP SDK: it provides its files as tools, answers the approval,
+// and a web client sees the same conversation.
 
 import * as acp from '@agentclientprotocol/sdk'
 import { acpAgent, editorTools } from '@wica/acp'
@@ -13,9 +13,9 @@ import { describe, expect, it } from 'vite-plus/test'
 import { scriptedModel } from '../src/index.ts'
 
 const askForDestructive: Authorize = (call) =>
-  call.annotations.destructiveHint ? { ask: `Autoriser ${call.tool} ?` } : 'allow'
+  call.annotations.destructiveHint ? { ask: `Allow ${call.tool}?` } : 'allow'
 
-/** Lit notes.txt par l'éditeur, l'écrit en majuscules, puis conclut. */
+/** Reads notes.txt through the editor, writes it in uppercase, then concludes. */
 const upperModel = () =>
   scriptedModel((request) => {
     const result = (callId: string) =>
@@ -42,11 +42,11 @@ const upperModel = () =>
         ],
       }
     }
-    return { parts: [{ type: 'text', text: write.isError ? 'Refusé.' : 'Fini.' }] }
+    return { parts: [{ type: 'text', text: write.isError ? 'Refused.' : 'Finished.' }] }
   })
 
 async function setup(choice: 'allow' | 'reject') {
-  // Outils de chaque conversation : ceux que l'éditeur de sa session fournit.
+  // Tools of each conversation: the ones the editor of its session provides.
   const tools = new Map<string, Tool[]>()
   const harness = createHarness({
     model: upperModel(),
@@ -68,19 +68,19 @@ async function setup(choice: 'allow' | 'reject') {
       void tools.set(session.conversationId, editorTools(session.capabilities)),
   })
 
-  // L'éditeur : un fichier ouvert, et le journal de ce qu'il a reçu, dans l'ordre.
-  const files = new Map([['/projet/notes.txt', 'acheter du pain']])
+  // The editor: an open file, and the log of what it received, in order.
+  const files = new Map([['/project/notes.txt', 'buy bread']])
   const log: string[] = []
   const chunks: string[] = []
   const statuses = new Map<string, string>()
   const editor = acp
-    .client({ name: 'éditeur' })
+    .client({ name: 'editor' })
     .onRequest('fs/read_text_file', ({ params }) => {
-      log.push(`lecture ${params.path}`)
+      log.push(`read ${params.path}`)
       return { content: files.get(params.path) ?? '' }
     })
     .onRequest('fs/write_text_file', ({ params }) => {
-      log.push(`écriture ${params.path}`)
+      log.push(`write ${params.path}`)
       files.set(params.path, params.content)
       return {}
     })
@@ -94,7 +94,7 @@ async function setup(choice: 'allow' | 'reject') {
       if (update.sessionUpdate === 'agent_message_chunk' && update.content.type === 'text') {
         chunks.push(update.content.text)
       } else if (update.sessionUpdate === 'tool_call') {
-        log.push(`appel ${update.toolCallId}`)
+        log.push(`call ${update.toolCallId}`)
         statuses.set(update.toolCallId, update.status ?? '')
       } else if (update.sessionUpdate === 'tool_call_update') {
         statuses.set(update.toolCallId, update.status ?? '')
@@ -110,14 +110,14 @@ async function setup(choice: 'allow' | 'reject') {
     clientCapabilities: capabilities,
   })
   const { sessionId } = await connection.agent.request('session/new', {
-    cwd: '/projet',
+    cwd: '/project',
     mcpServers: [],
   })
   return { harness, connect, wica, connection, sessionId, files, log, chunks, statuses }
 }
 
-describe('étape 8', () => {
-  it('une session ACP pilote le cœur : outils de l’éditeur, approbation, même vue que le web', async () => {
+describe('step 8', () => {
+  it('an ACP session drives the core: editor tools, approval, same view as the web', async () => {
     const { harness, connect, wica, connection, sessionId, files, log, chunks, statuses } =
       await setup('allow')
     const web = await connect()
@@ -125,21 +125,21 @@ describe('étape 8', () => {
 
     const response = await connection.agent.request('session/prompt', {
       sessionId,
-      prompt: [{ type: 'text', text: 'Mets notes.txt en majuscules.' }],
+      prompt: [{ type: 'text', text: 'Put notes.txt in uppercase.' }],
     })
 
     expect(response.stopReason).toBe('end_turn')
-    expect(files.get('/projet/notes.txt')).toBe('ACHETER DU PAIN')
-    // L'éditeur connaît chaque appel avant d'avoir à l'exécuter ou à l'autoriser.
+    expect(files.get('/project/notes.txt')).toBe('BUY BREAD')
+    // The editor knows each call before it has to run or allow it.
     expect(log).toEqual([
-      'appel r1',
-      'lecture /projet/notes.txt',
-      'appel w1',
+      'call r1',
+      'read /project/notes.txt',
+      'call w1',
       'permission w1',
-      'écriture /projet/notes.txt',
+      'write /project/notes.txt',
     ])
     expect(Object.fromEntries(statuses)).toEqual({ r1: 'completed', w1: 'completed' })
-    expect(chunks.join('')).toBe('Fini.')
+    expect(chunks.join('')).toBe('Finished.')
 
     const { items, head } = await harness.store.load(sessionId, 0)
     expect(journalViolations(items)).toEqual([])
@@ -151,18 +151,18 @@ describe('étape 8', () => {
     await wica.close()
   })
 
-  it('un refus dans l’éditeur laisse le fichier intact', async () => {
+  it('a refusal in the editor leaves the file intact', async () => {
     const { wica, connection, sessionId, files, log, chunks } = await setup('reject')
 
     const response = await connection.agent.request('session/prompt', {
       sessionId,
-      prompt: [{ type: 'text', text: 'Mets notes.txt en majuscules.' }],
+      prompt: [{ type: 'text', text: 'Put notes.txt in uppercase.' }],
     })
 
     expect(response.stopReason).toBe('end_turn')
-    expect(files.get('/projet/notes.txt')).toBe('acheter du pain')
-    expect(log).not.toContain('écriture /projet/notes.txt')
-    expect(chunks.join('')).toBe('Refusé.')
+    expect(files.get('/project/notes.txt')).toBe('buy bread')
+    expect(log).not.toContain('write /project/notes.txt')
+    expect(chunks.join('')).toBe('Refused.')
     connection.close()
     await wica.close()
   })

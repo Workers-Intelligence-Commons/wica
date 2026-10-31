@@ -1,6 +1,6 @@
-// `Store` du Harness sur Postgres. Le jeton de clôture et le bail vivent dans
-// `conversation_writers`, que la synchro ne voit pas ; chaque écriture vérifie l'`epoch` et
-// prolonge le bail dans la même transaction, et y lit la demande d'interruption.
+// Harness `Store` on Postgres. The fencing token and the lease live in `conversation_writers`,
+// which the sync does not see; each write checks the `epoch` and extends the lease in the same
+// transaction, and reads the interruption request there.
 
 import type { ItemDraft, Part } from '@wica/core'
 import { type Claim, type Snapshot, StaleEpochError, type Store } from '@wica/runtime'
@@ -15,7 +15,7 @@ const randomSalt = () => {
   return btoa(String.fromCharCode(...bytes))
 }
 
-/** Crée la conversation et son état d'écriture s'ils manquent. */
+/** Creates the conversation and its write state if they are missing. */
 async function ensure(sql: Sql, conversationId: string) {
   await sql`
     INSERT INTO conversations (id, id_salt) VALUES (${conversationId}, ${randomSalt()})
@@ -26,8 +26,8 @@ async function ensure(sql: Sql, conversationId: string) {
 }
 
 /**
- * Vérifie l'`epoch`, prolonge le bail et verrouille la ligne jusqu'à la fin de la transaction :
- * deux écritures de la même conversation s'y suivent, donc les `seq` ne se croisent pas.
+ * Checks the `epoch`, extends the lease and locks the row until the end of the transaction: two
+ * writes of the same conversation follow each other there, so the `seq` values do not cross.
  */
 async function fence(sql: postgres.TransactionSql, conversationId: string, epoch: number) {
   const [row] = await sql<{ last_seq: number; interrupt: boolean }[]>`
@@ -36,7 +36,7 @@ async function fence(sql: postgres.TransactionSql, conversationId: string, epoch
                            ELSE now() + lease_ms * interval '1 millisecond' END
     WHERE conversation_id = ${conversationId} AND writer_epoch = ${epoch}
     RETURNING last_seq, interrupt_requested_at IS NOT NULL AS interrupt`
-  if (!row) throw new StaleEpochError(`epoch ${epoch} périmé pour ${conversationId}`)
+  if (!row) throw new StaleEpochError(`epoch ${epoch} is stale for ${conversationId}`)
   return row
 }
 
@@ -84,7 +84,7 @@ export class PgStore implements Store {
       SELECT c.id_salt, c.head_item_id, w.interrupt_requested_at IS NOT NULL AS interrupt
       FROM conversations c JOIN conversation_writers w ON w.conversation_id = c.id
       WHERE c.id = ${conversationId}`
-    // Un élément en flux porte le texte de ses lots, recollés dans l'ordre de `idx`.
+    // A streaming item carries the text of its batches, joined back in the order of `idx`.
     const rows = await this.#sql<(ItemRow & { blob: Part[] | null; live: string | null })[]>`
       SELECT i.id, i.parent_id, i.seq, i.status, i.payload, b.data AS blob,
              CASE WHEN i.status = 'streaming' THEN (
@@ -170,7 +170,7 @@ export class PgStore implements Store {
       const updated = await sql`
         UPDATE items SET payload = ${sql.json(payload as postgres.JSONValue)}, status = ${final.status}
         WHERE conversation_id = ${conversationId} AND id = ${final.id}`
-      if (updated.count === 0) throw new Error(`élément inconnu : ${final.id}`)
+      if (updated.count === 0) throw new Error(`unknown item: ${final.id}`)
       await sql`
         DELETE FROM item_chunks WHERE conversation_id = ${conversationId} AND item_id = ${final.id}`
     })

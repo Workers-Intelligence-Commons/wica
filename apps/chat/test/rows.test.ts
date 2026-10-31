@@ -16,9 +16,9 @@ const result = (text: string): ItemDraft => ({
 const asItem = (payload: Record<string, unknown>): Item =>
   rowToItem({ id: 'r1', parent_id: 'c1', seq: 4, status: 'done', payload })
 
-describe('lignes des éléments', () => {
-  // La synchro ne doit pas transporter un gros résultat d'outil, mais le modèle doit le relire en entier.
-  it('met de côté un gros résultat d’outil, synchronise un aperçu et restaure l’élément complet', () => {
+describe('item rows', () => {
+  // The sync must not carry a large tool result, but the model must read it again in full.
+  it('sets aside a large tool result, syncs a preview and restores the full item', () => {
     const draft = result('x'.repeat(BLOB_THRESHOLD + 10))
     const { payload, blob } = draftToRow(draft)
     expect(blob?.sha256).toMatch(/^[0-9a-f]{64}$/)
@@ -31,8 +31,8 @@ describe('lignes des éléments', () => {
     expect(restoreItem(synced, blob?.output)).toEqual({ ...draft, seq: 4 })
   })
 
-  it('garde tel quel un résultat sous le seuil', () => {
-    const draft = result('court')
+  it('keeps a result under the threshold as it is', () => {
+    const draft = result('short')
     const { payload, blob } = draftToRow(draft)
     expect(blob).toBeNull()
     expect(asItem(payload)).toEqual({ ...draft, seq: 4 })

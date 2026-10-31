@@ -1,5 +1,5 @@
-// Un tour : réclamer la conversation, reconstruire l'état depuis le journal, passer les
-// événements reçus à `step`, exécuter les intentions, écrire, puis continuer ou s'arrêter.
+// A turn: claim the conversation, rebuild the state from the journal, pass the received events
+// to `step`, run the intents, write, then continue or stop.
 
 import {
   type AssistantMessage,
@@ -35,25 +35,25 @@ export interface ModelAdapter {
   stream(request: ModelRequest, signal: AbortSignal): AsyncIterable<ModelChunk>
 }
 
-/** Ce que le serveur pousse aux clients abonnés, après écriture. */
+/** What the server pushes to the subscribed clients, after writing. */
 export type Observer = {
   items?: (items: Item[]) => void
   delta?: (itemId: string, text: string) => void
   head?: (itemId: string) => void
   progress?: (callId: string, message: string) => void
-  /** Traces de l'hôte avant et après chaque outil exécuté. */
+  /** Host traces before and after each tool that runs. */
   toolStart?: (call: ToolCall) => void
   toolEnd?: (call: ToolCall, result: { output: Part[]; isError: boolean }) => void
 }
 
 export type Limits = {
-  /** Appels au modèle par tour. */
+  /** Model calls per turn. */
   maxModelCalls?: number
-  /** Taille maximale, en caractères, du texte d'un résultat d'outil gardé dans le journal. */
+  /** Maximum size, in characters, of the text of a tool result kept in the journal. */
   maxResultChars?: number
   /**
-   * Durée totale d'un tour, en millisecondes. Vérifiée entre deux intentions : le tour s'arrête
-   * alors avec `limited`, sans couper une intention en cours.
+   * Total duration of a turn, in milliseconds. Checked between two intents: the turn then stops
+   * with `limited`, without cutting an intent in progress.
    */
   maxDurationMs?: number
 }
@@ -64,62 +64,62 @@ export type TurnOptions = {
   tools: Tool[]
   conversationId: string
   authorize?: Authorize
-  /** Confiance de l'entrée qui déclenche ce tour, transmise à `authorize`. */
+  /** Trust of the input that triggers this turn, passed to `authorize`. */
   trust?: Trust
   attached?: boolean
-  /** Heure fournie aux événements : le cœur ne lit jamais l'horloge. */
+  /** Time provided to the events: the core never reads the clock. */
   now?: () => string
   events?: EventBody[]
   policy?: Policy
-  /** Nombre d'intentions de travail exécutées avant de rendre la main et de demander une reprise. */
+  /** Number of work intents run before handing back control and asking for a resume. */
   maxIntents?: number
   /**
-   * Budget de temps du tour, en millisecondes : passé ce délai, le tour rend la main entre deux
-   * intentions et demande une reprise (`done: false`). Sert aux plateformes à durée limitée.
+   * Time budget of the turn, in milliseconds: past this delay, the turn hands back control between
+   * two intents and asks for a resume (`done: false`). Serves platforms with a limited duration.
    */
   budgetMs?: number
-  /** Durée du bail posé par la réclamation, prolongé tant que le tour vit. 30 s par défaut. */
+  /** Duration of the lease set by the claim, extended as long as the turn lives. 30 s by default. */
   leaseMs?: number
-  /** Éléments ajoutés depuis le dernier instantané avant d'en écrire un nouveau. 100 par défaut. */
+  /** Items added since the last snapshot before writing a new one. 100 by default. */
   snapshotEvery?: number
   limits?: Limits
   observer?: Observer
   signal?: AbortSignal
-  /** Consignes de l'hôte, ajoutées à chaque requête au modèle. */
+  /** Host instructions, added to each model request. */
   instructions?: string
-  /** Réponses aux questions posées par un outil en cours ; sans registre, `ctx.ask` échoue. */
+  /** Answers to the questions asked by a running tool; without a registry, `ctx.ask` fails. */
   answers?: AnswerRegistry
-  /** Approbateur désigné de la conversation : ses demandes d'approbation lui sont adressées. */
+  /** Designated approver of the conversation: its approval requests are addressed to them. */
   approver?: Destination
   /**
-   * Délai d'un outil confié à un client quand aucun client n'est attaché : passé ce délai,
-   * l'appel reçoit une erreur dédiée au lieu d'attendre sans fin. Absent : il attend.
+   * Delay of a tool delegated to a client when no client is attached: past this delay, the call
+   * receives a dedicated error instead of waiting forever. Absent: it waits.
    */
   clientToolTimeoutMs?: number
 }
 
 export type Answer = { value: unknown; output: Part[]; from?: Origin }
 
-/** Livre à un outil qui attend la réponse à sa question. Fourni par le serveur. */
+/** Delivers to a tool that waits for the answer to its question. Provided by the server. */
 export interface AnswerRegistry {
   wait(conversationId: string, callId: string, signal: AbortSignal): Promise<Answer>
 }
 
 export type TurnResult = {
   state: State
-  /** Questions et approbations qui attendent la personne. */
+  /** Questions and approvals waiting for the person. */
   waiting: Question[]
-  /** Faux quand le tour s'arrête avec du travail restant : l'hôte planifie une reprise. */
+  /** False when the turn stops with work remaining: the host schedules a resume. */
   done: boolean
-  /** Vrai quand une limite a arrêté le tour. */
+  /** True when a limit stopped the turn. */
   limited: boolean
-  /** Échec du service de modèle qui a arrêté le tour. */
+  /** Failure of the model service that stopped the turn. */
   error?: Error
-  /** Heure à laquelle réveiller la conversation : réveil prévu, échéance d'une attente. */
+  /** Time at which to wake the conversation: scheduled wake-up, deadline of a wait. */
   wakeAt?: string
-  /** Questions et approbations écrites par ce tour, qui attendent la personne. */
+  /** Questions and approvals written by this turn, waiting for the person. */
   asked: Question[]
-  /** Vrai quand le tour a exécuté du travail (modèle ou outil). */
+  /** True when the turn ran work (model or tool). */
   worked: boolean
 }
 
@@ -132,8 +132,8 @@ const text = (t: string): Part[] => [{ type: 'text', text: t }]
 const asError = (e: unknown) => (e instanceof Error ? e : new Error(String(e)))
 
 /**
- * Confiance de l'entrée qui a déclenché le travail en cours : le dernier message d'une personne
- * ou événement externe du chemin. Un tour sans état la retrouve ainsi dans le journal.
+ * Trust of the input that triggered the work in progress: the last message from a person or
+ * external event of the path. A stateless turn finds it this way in the journal.
  */
 export function triggerTrust(path: readonly Item[]): Trust {
   const trigger = path.findLast((i) => i.kind === 'user_message' || i.kind === 'external_event')
@@ -142,12 +142,12 @@ export function triggerTrust(path: readonly Item[]): Trust {
   return 'owner'
 }
 
-/** Un autre tour tient la conversation : réessayer après `busyForMs`. */
+/** Another turn holds the conversation: retry after `busyForMs`. */
 export class ConversationBusyError extends Error {
   override name = 'ConversationBusyError'
   readonly busyForMs: number
   constructor(busyForMs: number) {
-    super(`conversation tenue par un autre tour pendant encore ${busyForMs} ms`)
+    super(`conversation held by another turn for another ${busyForMs} ms`)
     this.busyForMs = busyForMs
   }
 }
@@ -156,8 +156,8 @@ const DEFAULT_LEASE_MS = 30_000
 const DEFAULT_SNAPSHOT_EVERY = 100
 
 /**
- * Instantané des éléments réglés : tout jusqu'au premier élément encore en flux, qu'un tour
- * suivant peut encore régler. Rien d'un instantané ne change donc plus après son écriture.
+ * Snapshot of the settled items: everything up to the first item still streaming, which a
+ * following turn can still settle. Nothing of a snapshot therefore changes after it is written.
  */
 export function takeSnapshot(items: readonly Item[]): Snapshot | undefined {
   const sorted = [...items].sort((a, b) => a.seq - b.seq)
@@ -167,10 +167,10 @@ export function takeSnapshot(items: readonly Item[]): Snapshot | undefined {
   return last ? { schema: 1, seq: last.seq, items: settled } : undefined
 }
 
-/** Arrêt demandé par la personne : le tour ferme proprement ce qui est ouvert. */
+/** Stop requested by the person: the turn cleanly closes what is open. */
 class Interrupted extends Error {}
 
-/** Le service de modèle a échoué après ses réessais. */
+/** The model service failed after its retries. */
 class ModelFailed extends Error {
   readonly error: Error
   constructor(error: Error) {
@@ -186,7 +186,7 @@ const truncate = (parts: Part[], max: number | undefined): Part[] =>
         p.type === 'text' && p.text.length > max
           ? {
               type: 'text',
-              text: `${p.text.slice(0, max)}\n[tronqué : ${p.text.length - max} caractères]`,
+              text: `${p.text.slice(0, max)}\n[truncated: ${p.text.length - max} characters]`,
             }
           : p,
       )
@@ -200,8 +200,8 @@ async function turn(o: TurnOptions): Promise<TurnResult> {
   const claimed = await o.store.claim(id, leaseMs)
   if (!('epoch' in claimed)) throw new ConversationBusyError(claimed.busyForMs)
   const { epoch } = claimed
-  // Le bail est prolongé tant que le tour vit ; repris par un autre tour, celui-ci s'arrête sans
-  // écrire. Un échec passager (réseau coupé) n'arrête rien : l'outil en cours se termine.
+  // The lease is extended as long as the turn lives; taken over by another turn, this one stops
+  // without writing. A transient failure (network down) stops nothing: the running tool finishes.
   let lost: Error | null = null
   let renewing = false
   const renewal = setInterval(() => {
@@ -248,7 +248,7 @@ async function claimedTurn(
   const batchIndex = new Map<string, number>()
   let interruptRequested = loaded.interruptRequested
   const startSeq = state.maxSeq
-  /** Réveils demandés par la dernière reprise : ce qu'il reste à attendre quand le tour s'arrête. */
+  /** Wake-ups requested by the last resume: what remains to wait for when the turn stops. */
   let schedules: string[] = []
 
   const apply = async (event: EventBody): Promise<Work[]> => {
@@ -298,14 +298,14 @@ async function claimedTurn(
     return work
   }
 
-  /** L'interruption demandée est vue à chaque écriture : le tour s'arrête au lot suivant. */
+  /** The requested interruption is seen at each write: the turn stops at the next batch. */
   const checkInterrupt = () => {
     if (!interruptRequested) return
-    abort.abort(new Error('interrompu'))
+    abort.abort(new Error('interrupted'))
     throw new Interrupted()
   }
 
-  /** Requête de résumé : seul le texte final compte, et il devient l'événement `compacted`. */
+  /** Summary request: only the final text counts, and it becomes the `compacted` event. */
   const summarize = async (request: ModelRequest, range: { from: string; to: string }) => {
     let summary = ''
     try {
@@ -321,8 +321,8 @@ async function claimedTurn(
       if (error instanceof Interrupted) throw error
       throw signal.aborted ? new Interrupted() : new ModelFailed(asError(error))
     }
-    // Un résumé vide effacerait le passé de la vue du modèle : le tour s'arrête plutôt.
-    if (summary === '') throw new ModelFailed(new Error('Le modèle a rendu un résumé vide.'))
+    // An empty summary would erase the past from the model view: the turn stops instead.
+    if (summary === '') throw new ModelFailed(new Error('The model returned an empty summary.'))
     await apply({ t: 'compacted', ...range, summary })
   }
 
@@ -341,7 +341,7 @@ async function claimedTurn(
         }
         if (next.done) break
         const chunk = next.value
-        // Chaque morceau est écrit dès son arrivée : rien n'est montré avant d'être persisté.
+        // Each chunk is written as soon as it arrives: nothing is shown before being persisted.
         if (chunk.type === 'done') await apply({ t: 'model_done', message: chunk.message })
         else await apply({ t: 'model_delta', delta: chunk })
       }
@@ -353,7 +353,7 @@ async function claimedTurn(
   const asker = (call: ToolCall) => {
     let n = 0
     return async (input: unknown): Promise<unknown> => {
-      if (!o.answers) throw new Error('Aucun canal utilisateur pour poser une question.')
+      if (!o.answers) throw new Error('No user channel to ask a question.')
       const callId = elicitCallId(call.callId, n++)
       await apply({ t: 'tool_question', callId: call.callId, n: n - 1, input })
       const answer = await o.answers.wait(id, callId, signal)
@@ -368,7 +368,7 @@ async function claimedTurn(
   }
 
   const execute = async (call: ToolCall, tool: Tool | undefined) => {
-    if (!tool?.run) return { output: text(`Outil inconnu : ${call.tool}`), isError: true }
+    if (!tool?.run) return { output: text(`Unknown tool: ${call.tool}`), isError: true }
     try {
       const output = await tool.run(call.input, {
         callId: call.callId,
@@ -392,8 +392,8 @@ async function claimedTurn(
         { ...call, annotations },
         { trust, attached: o.attached ?? false },
       )
-      // Une entrée non fiable ne déclenche un outil destructif qu'avec une approbation, quelle
-      // que soit la politique de l'hôte.
+      // An untrusted input triggers a destructive tool only with an approval, whatever the host
+      // policy.
       if (decision === 'allow' && trust === 'untrusted' && isDestructive(annotations)) {
         decision = { ask: `Allow ${call.tool}? The request comes from untrusted input.` }
       }
@@ -406,23 +406,23 @@ async function claimedTurn(
         })
       }
       if (decision !== 'allow') {
-        const reason = decision === 'deny' ? 'Refusé par la politique de l’hôte.' : decision.deny
+        const reason = decision === 'deny' ? 'Refused by the host policy.' : decision.deny
         return apply({ t: 'tool_result', callId: call.callId, output: text(reason), isError: true })
       }
     }
-    // Outil exécuté par un client (fichiers d'un éditeur) : autorisé ici, exécuté là-bas.
+    // Tool run by a client (files of an editor): allowed here, run there.
     if (tool?.spec.runsOn === 'client') return apply({ t: 'tool_handed', callId: call.callId })
-    // Réveils : le cœur les écrit dans le journal, sans effet hors du journal à réclamer.
+    // Wake-ups: the core writes them into the journal, with no effect outside the journal to claim.
     if (call.tool === SCHEDULE_TOOL) return apply({ t: 'wakeup_scheduled', callId: call.callId })
     if (call.tool === CANCEL_WAKEUP_TOOL) {
       return apply({ t: 'wakeup_cancelled', callId: call.callId })
     }
     if ((await o.store.claimToolCall(id, call.callId, epoch)) === 'already_claimed') {
-      // Personne ne sait si l'effet de l'outil a eu lieu : il n'est jamais relancé.
+      // No one knows whether the effect of the tool took place: it is never started again.
       return apply({
         t: 'tool_result',
         callId: call.callId,
-        output: text("État inconnu : l'exécution précédente s'est arrêtée sans résultat."),
+        output: text('Unknown state: the previous run stopped without a result.'),
         isError: true,
       })
     }
@@ -438,8 +438,8 @@ async function claimedTurn(
   }
 
   /**
-   * Outils confiés à un client alors qu'aucun client n'est attaché : l'appel échoue à son
-   * échéance. Rend l'échéance la plus proche de ceux qui attendent encore.
+   * Tools delegated to a client while no client is attached: the call fails at its deadline.
+   * Returns the closest deadline among those still waiting.
    */
   const clientDeadlines = async (expire: boolean): Promise<number | undefined> => {
     const timeout = o.clientToolTimeoutMs
@@ -465,7 +465,7 @@ async function claimedTurn(
         await apply({
           t: 'tool_result',
           callId,
-          output: text('Aucun client attaché n’a exécuté cet appel dans le délai.'),
+          output: text('No attached client ran this call within the delay.'),
           isError: true,
         })
       } else {
@@ -475,7 +475,7 @@ async function claimedTurn(
     return next
   }
 
-  /** Ce que l'hôte doit savoir en plus quand le tour s'arrête. */
+  /** What the host must also know when the turn stops. */
   const finish = async (outcome: Outcome, executed: number): Promise<TurnResult> => {
     const deadline = await clientDeadlines(false)
     const times = [...schedules.map((t) => Date.parse(t)), ...(deadline ? [deadline] : [])]
@@ -509,7 +509,7 @@ async function claimedTurn(
       if (executed >= (o.maxIntents ?? Infinity)) {
         return { state, waiting, done: false, limited: false }
       }
-      // Le budget ne compte qu'après une intention, sinon un tour lent à charger ne ferait rien.
+      // The budget counts only after an intent, otherwise a turn slow to load would do nothing.
       if (executed > 0 && Date.now() - startedAt >= (o.budgetMs ?? Infinity)) {
         return { state, waiting, done: false, limited: false }
       }
@@ -526,7 +526,7 @@ async function claimedTurn(
         await runModel(model.request)
         continue
       }
-      // Seuls les outils en lecture seule s'exécutent ensemble ; les autres, un par un.
+      // Only read-only tools run together; the others, one by one.
       const calls = (ws: Work[]) => ws.flatMap((w) => (w.t === 'run_tool' ? [w.call] : []))
       await Promise.all(calls(runnable.filter(isReadOnly)).map(runTool))
       for (const call of calls(runnable.filter((w) => !isReadOnly(w)))) await runTool(call)
@@ -563,5 +563,5 @@ async function claimedTurn(
   }
 }
 
-/** Exécute un tour sur une conversation. */
+/** Runs a turn on a conversation. */
 export const runTurn = (options: TurnOptions): Promise<TurnResult> => turn(options)

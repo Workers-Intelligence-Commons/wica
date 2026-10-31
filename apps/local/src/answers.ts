@@ -1,21 +1,21 @@
-// Questions au terminal : le texte affiché pour une question, et la lecture de ce que la
-// personne tape en réponse. Pur, pour être testé sans terminal.
+// Terminal questions: the text shown for a question, and the reading of what the person types
+// in reply. Pure, so that it can be tested without a terminal.
 
 import type { AskUserAnswer, AskUserInput } from '@wica/tools-user'
 
 export type Parsed<T> = { ok: T } | { error: string }
 
-const YES = ['o', 'oui', 'y', 'yes']
-const NO = ['n', 'non', 'no']
+const YES = ['y', 'yes']
+const NO = ['n', 'no']
 
 export function parseYesNo(line: string): Parsed<boolean> {
   const word = line.trim().toLowerCase()
   if (YES.includes(word)) return { ok: true }
   if (NO.includes(word)) return { ok: false }
-  return { error: 'Réponds par o (oui) ou n (non).' }
+  return { error: 'Answer y (yes) or n (no).' }
 }
 
-/** Texte de la question, options numérotées, et ce que la personne doit taper. */
+/** Text of the question, numbered options, and what the person must type. */
 export function prompt(input: AskUserInput): string {
   switch (input.kind) {
     case 'choice':
@@ -23,12 +23,11 @@ export function prompt(input: AskUserInput): string {
       const lines = input.options.map(
         (o, i) => `  ${i + 1}. ${o.label}${o.description ? ` (${o.description})` : ''}`,
       )
-      const how =
-        input.kind === 'choice' ? 'Tape un numéro.' : 'Tape des numéros séparés par des virgules.'
+      const how = input.kind === 'choice' ? 'Type a number.' : 'Type numbers separated by commas.'
       return [input.question, ...lines, how].join('\n')
     }
     case 'confirm':
-      return `${input.question} [o/n]`
+      return `${input.question} [y/n]`
     case 'text':
       return input.question
     case 'form':
@@ -36,7 +35,7 @@ export function prompt(input: AskUserInput): string {
   }
 }
 
-/** Lit la réponse à une question qui tient sur une ligne ; un formulaire passe par `parseField`. */
+/** Reads the answer to a question that fits on one line; a form goes through `parseField`. */
 export function parseAnswer(input: AskUserInput, line: string): Parsed<AskUserAnswer> {
   switch (input.kind) {
     case 'confirm': {
@@ -54,33 +53,33 @@ export function parseAnswer(input: AskUserInput, line: string): Parsed<AskUserAn
         .map(Number)
       const valid = numbers.every((n) => Number.isInteger(n) && n >= 1 && n <= input.options.length)
       if (!valid || numbers.length === 0) {
-        return { error: `Choisis entre 1 et ${input.options.length}.` }
+        return { error: `Choose between 1 and ${input.options.length}.` }
       }
       const labels = numbers.map((n) => input.options[n - 1]!.label)
       if (input.kind === 'choice') {
         return numbers.length === 1
           ? { ok: { kind: 'choice', label: labels[0]! } }
-          : { error: 'Un seul numéro.' }
+          : { error: 'Only one number.' }
       }
       return { ok: { kind: 'multiple', labels } }
     }
     case 'form':
-      return { error: 'Un formulaire se remplit champ par champ.' }
+      return { error: 'A form is filled in field by field.' }
   }
 }
 
 type Field = Extract<AskUserInput, { kind: 'form' }>['fields'][number]
 
-/** Lit la valeur d'un champ de formulaire ; une ligne vide laisse un champ facultatif vide. */
+/** Reads the value of a form field; an empty line leaves an optional field empty. */
 export function parseField(field: Field, line: string): Parsed<string | number | boolean | null> {
   const raw = line.trim()
-  if (raw === '') return field.required ? { error: 'Ce champ est requis.' } : { ok: null }
+  if (raw === '') return field.required ? { error: 'This field is required.' } : { ok: null }
   switch (field.type) {
     case 'string':
       return { ok: raw }
     case 'number': {
       const n = Number(raw.replace(',', '.'))
-      return Number.isFinite(n) ? { ok: n } : { error: 'Un nombre est attendu.' }
+      return Number.isFinite(n) ? { ok: n } : { error: 'A number is expected.' }
     }
     case 'boolean':
       return parseYesNo(raw)
@@ -88,14 +87,12 @@ export function parseField(field: Field, line: string): Parsed<string | number |
       const options = field.options ?? []
       const n = Number(raw)
       if (Number.isInteger(n) && n >= 1 && n <= options.length) return { ok: options[n - 1]! }
-      return options.includes(raw)
-        ? { ok: raw }
-        : { error: `Choisis parmi : ${options.join(', ')}.` }
+      return options.includes(raw) ? { ok: raw } : { error: `Choose among: ${options.join(', ')}.` }
     }
   }
 }
 
-/** Champ d'une demande d'information MCP ; `list` : plusieurs valeurs séparées par des virgules. */
+/** Field of an MCP information request; `list`: several values separated by commas. */
 export type ElicitField = Field & { list?: boolean }
 
 type PropertySchema = {
@@ -111,8 +108,8 @@ const strings = (values: unknown[] | undefined) =>
   values?.filter((v): v is string => typeof v === 'string')
 
 /**
- * Champs à demander pour le `requestedSchema` d'une demande MCP en mode formulaire : MCP n'y
- * admet que des propriétés de premier niveau de type texte, nombre, booléen ou énumération.
+ * Fields to ask for the `requestedSchema` of an MCP request in form mode: MCP allows there only
+ * top-level properties of type text, number, boolean or enumeration.
  */
 export function elicitFields(schema: unknown): ElicitField[] {
   const s = (schema ?? {}) as { properties?: Record<string, PropertySchema>; required?: string[] }
@@ -134,7 +131,7 @@ export function elicitFields(schema: unknown): ElicitField[] {
   })
 }
 
-/** Lit un champ de demande MCP ; une liste garde les valeurs non vides, dans l'ordre tapé. */
+/** Reads an MCP request field; a list keeps the non-empty values, in the order typed. */
 export function parseElicitField(
   field: ElicitField,
   line: string,
@@ -144,9 +141,10 @@ export function parseElicitField(
     .split(',')
     .map((v) => v.trim())
     .filter(Boolean)
-  if (values.length === 0) return field.required ? { error: 'Ce champ est requis.' } : { ok: null }
+  if (values.length === 0)
+    return field.required ? { error: 'This field is required.' } : { ok: null }
   const unknown = field.options ? values.filter((v) => !field.options!.includes(v)) : []
   return unknown.length > 0
-    ? { error: `Choisis parmi : ${field.options!.join(', ')}.` }
+    ? { error: `Choose among: ${field.options!.join(', ')}.` }
     : { ok: values }
 }

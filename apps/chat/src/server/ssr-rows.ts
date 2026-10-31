@@ -1,6 +1,6 @@
-// Lignes du rendu serveur, lues dans Postgres pour le compte de la requête : la page part avec
-// ce qui définit l'écran, puis la synchro du navigateur prend le relais. Pour une conversation,
-// seuls les derniers éléments du chemin affiché sont attendus.
+// Server rendering rows, read from Postgres for the account of the request: the page leaves with
+// what defines the screen, then the browser sync takes over. For a conversation, only the last
+// items of the displayed path are awaited.
 
 import { pathTo } from '@wica/core'
 
@@ -8,7 +8,7 @@ import { rowToItem, type ItemRow } from '../shared/rows.ts'
 import type { ShapeTable } from '../client/collections.ts'
 import { currentScope } from './context.ts'
 
-/** Éléments du chemin affiché envoyés avec la page ; le reste arrive par la synchro. */
+/** Items of the displayed path sent with the page; the rest arrives through the sync. */
 export const SSR_PATH_ITEMS = 30
 
 export async function serverRows(

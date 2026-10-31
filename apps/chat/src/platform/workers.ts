@@ -1,6 +1,6 @@
-// Plateforme Cloudflare Workers : une connexion Postgres par invocation (par Hyperdrive, ou une
-// adresse directe), fermée quand la réponse a fini de partir, et Cloudflare Queues pour les
-// réveils. Un message de la file lance le tour suivant de sa conversation.
+// Cloudflare Workers platform: one Postgres connection per invocation (through Hyperdrive, or a
+// direct address), closed when the response has finished sending, and Cloudflare Queues for
+// wake-ups. A queue message starts the next turn of its conversation.
 
 import { env, waitUntil } from 'cloudflare:workers'
 import postgres from 'postgres'
@@ -14,7 +14,7 @@ type Env = Record<string, unknown> & {
   HYPERDRIVE?: { connectionString: string }
 }
 
-/** Marge sous la limite de 15 minutes d'un consommateur de file. */
+/** Margin under the 15-minute limit of a queue consumer. */
 const TURN_BUDGET_MS = 10 * 60_000
 
 function open() {
@@ -32,7 +32,7 @@ function open() {
   return { chat, sql }
 }
 
-/** Le chat de cette invocation ; la connexion se ferme après le dernier octet de la réponse. */
+/** The chat of this invocation; the connection closes after the last byte of the response. */
 export async function withChat(
   _req: Request,
   fn: (chat: ChatServer) => Promise<Response>,
@@ -64,7 +64,7 @@ export async function withChat(
 
 export const startBackground = undefined
 
-/** Consommateur de la file des réveils. */
+/** Consumer of the wake-up queue. */
 export const queue = async (batch: {
   messages: { body: { conversationId: string }; ack(): void; retry(): void }[]
 }) => {

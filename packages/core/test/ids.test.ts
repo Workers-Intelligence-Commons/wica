@@ -6,8 +6,8 @@ import { canonicalJson, serverItemId, sha256, userMessageId } from '../src/index
 const hex = (b: Uint8Array) => Buffer.from(b).toString('hex')
 
 describe('sha256', () => {
-  // Valeurs de référence de la FIPS 180-4 : le client et le serveur doivent obtenir les mêmes octets.
-  it('donne les empreintes de référence', () => {
+  // Reference values from FIPS 180-4: the client and the server must get the same bytes.
+  it('gives the reference hashes', () => {
     const enc = (s: string) => new Uint8Array(Buffer.from(s, 'utf8'))
     expect(hex(sha256(enc('')))).toBe(
       'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
@@ -20,7 +20,7 @@ describe('sha256', () => {
     )
   })
 
-  it("concorde avec l'implémentation de Node sur toutes les tailles autour des blocs", () => {
+  it('matches the Node implementation for every size around the blocks', () => {
     for (let n = 0; n < 200; n++) {
       const data = new Uint8Array(randomBytes(n))
       expect(hex(sha256(data))).toBe(createHash('sha256').update(data).digest('hex'))
@@ -29,7 +29,7 @@ describe('sha256', () => {
 })
 
 describe('canonicalJson', () => {
-  it("ne dépend pas de l'ordre des clés et omet les propriétés absentes", () => {
+  it('does not depend on key order and omits absent properties', () => {
     expect(canonicalJson({ b: 1, a: [true, null, 'é'], c: undefined })).toBe(
       canonicalJson({ a: [true, null, 'é'], b: 1 }),
     )
@@ -39,28 +39,28 @@ describe('canonicalJson', () => {
 
 describe('userMessageId', () => {
   const base = {
-    salt: 'sel-1',
+    salt: 'salt-1',
     conversationId: 'conv-1',
     parentId: 'parent-1',
     from: { channel: 'web', author: 'alice' },
-    parts: [{ type: 'text' as const, text: 'oui' }],
+    parts: [{ type: 'text' as const, text: 'yes' }],
   }
 
-  it("est le même pour le client et le serveur, et c'est un UUID v8", () => {
+  it('is the same for the client and the server, and it is a UUID v8', () => {
     const id = userMessageId(base)
     expect(userMessageId(structuredClone(base))).toBe(id)
     expect(id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
   })
 
-  it('distingue les auteurs, les parents, les contenus et les sels', () => {
+  it('distinguishes authors, parents, contents and salts', () => {
     const id = userMessageId(base)
     expect(userMessageId({ ...base, from: { channel: 'web', author: 'bob' } })).not.toBe(id)
     expect(userMessageId({ ...base, parentId: null })).not.toBe(id)
-    expect(userMessageId({ ...base, parts: [{ type: 'text', text: 'non' }] })).not.toBe(id)
-    expect(userMessageId({ ...base, salt: 'sel-2' })).not.toBe(id)
+    expect(userMessageId({ ...base, parts: [{ type: 'text', text: 'no' }] })).not.toBe(id)
+    expect(userMessageId({ ...base, salt: 'salt-2' })).not.toBe(id)
   })
 
-  it('prend un fichier par son empreinte, pas par son adresse', () => {
+  it('takes a file by its hash, not by its address', () => {
     const file = (uri: string) => ({
       ...base,
       parts: [{ type: 'file' as const, uri, mediaType: 'image/png', sha256: 'abc' }],
@@ -70,7 +70,7 @@ describe('userMessageId', () => {
 })
 
 describe('serverItemId', () => {
-  it("distingue le rang et l'entrée déclencheuse", () => {
+  it('distinguishes the rank and the triggering input', () => {
     const base = { conversationId: 'c', parentId: 'p', trigger: 't', rank: 0 }
     const id = serverItemId(base)
     expect(serverItemId({ ...base })).toBe(id)

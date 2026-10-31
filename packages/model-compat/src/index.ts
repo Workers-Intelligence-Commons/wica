@@ -1,6 +1,6 @@
-// Adaptateur de modèle pour un service Open Responses, wic-serving en premier.
-// La conversion vient de `codecs` ;
-// ce paquet ne fait que le réseau : requête, réessais avant le flux, lecture du flux, annulation.
+// Model adapter for an Open Responses service, wic-serving first. The conversion comes from
+// `codecs`; this package does only the networking: request, retries before the stream, reading
+// the stream, cancellation.
 
 import {
   createOpenResponsesDecoder,
@@ -12,23 +12,23 @@ import type { ModelRequest } from '@wica/core'
 import type { ModelAdapter, ModelChunk } from '@wica/runtime'
 
 export type OpenResponsesModelOptions = {
-  /** Adresse de base de l'API, par exemple `http://localhost:8000/v1`. */
+  /** Base address of the API, for example `http://localhost:8000/v1`. */
   baseUrl: string
   model: string
-  /** Nom inscrit dans les données opaques du raisonnement ; par défaut `wic-serving`. */
+  /** Name written into the opaque reasoning data; `wic-serving` by default. */
   provider?: string
-  /** Clé envoyée en `Authorization: Bearer`, lue à chaque requête. */
+  /** Key sent in `Authorization: Bearer`, read at each request. */
   apiKey?: string | (() => Promise<string>)
   headers?: Record<string, string>
   reasoning?: RequestOptions['reasoning']
   maxOutputTokens?: number
   temperature?: number
-  /** Réessais d'une requête qui échoue avant le début du flux ; 3 par défaut. */
+  /** Retries of a request that fails before the stream starts; 3 by default. */
   retries?: number
   fetch?: typeof fetch
 }
 
-/** Échec du service de modèle, après réessais. */
+/** Failure of the model service, after retries. */
 export class ModelError extends Error {
   override name = 'ModelError'
   readonly status: number | undefined
@@ -48,7 +48,7 @@ class Retryable {
   }
 }
 
-/** Statuts HTTP passagers : la même requête peut réussir plus tard. */
+/** Transient HTTP statuses: the same request may succeed later. */
 export const isRetryableStatus = (status: number) =>
   status === 408 || status === 409 || status === 429 || status >= 500
 
@@ -63,7 +63,7 @@ async function errorMessage(response: Response): Promise<{ message: string; code
       }
     }
   } catch {
-    // Corps qui n'est pas du JSON : on garde le texte.
+    // A body that is not JSON: keep the text.
   }
   return { message: body || response.statusText || `HTTP ${response.status}` }
 }
@@ -73,14 +73,14 @@ export function openResponsesModel(options: OpenResponsesModelOptions): ModelAda
   const doFetch = options.fetch ?? fetch
   const url = `${options.baseUrl.replace(/\/+$/, '')}/responses`
 
-  /** Attente avant un nouvel essai, interrompue par l'annulation. */
+  /** Wait before a new attempt, interrupted by cancellation. */
   const wait = (ms: number, signal: AbortSignal) =>
     new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, ms)
       signal.addEventListener('abort', () => (clearTimeout(timer), resolve()), { once: true })
     })
 
-  /** Une tentative : le flux de la réponse, ou une erreur marquée passagère ou définitive. */
+  /** One attempt: the response stream, or an error marked transient or permanent. */
   const attempt = async (body: string, signal: AbortSignal) => {
     const key = typeof options.apiKey === 'function' ? await options.apiKey() : options.apiKey
     let response: Response
@@ -97,8 +97,8 @@ export function openResponsesModel(options: OpenResponsesModelOptions): ModelAda
         signal,
       })
     } catch (error) {
-      if (signal.aborted) throw new ModelError('Requête au modèle annulée.')
-      throw new Retryable(new ModelError(`Service de modèle injoignable : ${String(error)}`))
+      if (signal.aborted) throw new ModelError('Model request cancelled.')
+      throw new Retryable(new ModelError(`Model service unreachable: ${String(error)}`))
     }
     if (response.ok && response.body) return response.body
     const { message, code } = await errorMessage(response)
@@ -106,7 +106,7 @@ export function openResponsesModel(options: OpenResponsesModelOptions): ModelAda
     throw isRetryableStatus(response.status) ? new Retryable(error) : error
   }
 
-  /** Réessaie les échecs passagers avec une attente qui double, tant que le flux n'a pas commencé. */
+  /** Retries transient failures with a doubling wait, as long as the stream has not started. */
   const connect = async (request: ModelRequest, signal: AbortSignal) => {
     const body = JSON.stringify(
       toOpenResponsesRequest(request, {
@@ -156,7 +156,7 @@ export function openResponsesModel(options: OpenResponsesModelOptions): ModelAda
         await reader.cancel().catch(() => {})
       }
       if (!decoder.finished)
-        throw new ModelError('Le flux du modèle s’est arrêté sans réponse finale.')
+        throw new ModelError('The model stream stopped without a final response.')
     },
   }
 }

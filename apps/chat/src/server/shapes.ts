@@ -1,14 +1,14 @@
-// Proxy des shapes : le client n'atteint jamais Electric. L'application fixe la table, le filtre
-// et les colonnes de chaque shape ; du client, elle ne transmet que les paramètres du protocole
-// de synchro (position, reprise, attente en direct), et elle ajoute le secret d'Electric.
+// Shape proxy: the client never reaches Electric. The application sets the table, the filter and
+// the columns of each shape; from the client, it forwards only the sync protocol parameters
+// (position, resume, live wait), and it adds the Electric secret.
 
 export type ShapeName = 'conversations' | 'items' | 'item_chunks' | 'servers' | 'commands'
 
 export type ShapeSpec = { table: string; where: string; params: string[]; columns: string[] }
 
 /**
- * Paramètres du protocole de synchro qu'un client peut fixer : ceux du client Electric, sans les
- * sous-ensembles, que les shapes du chat (synchro complète) n'utilisent pas.
+ * Sync protocol parameters a client can set: those of the Electric client, without the subsets,
+ * which the chat shapes (full sync) do not use.
  */
 const CLIENT_PARAMS = new Set([
   'live',
@@ -23,8 +23,8 @@ const CLIENT_PARAMS = new Set([
 ])
 
 /**
- * La shape servie pour une demande. `owner` est le compte qui lit ; `conversationId` n'est
- * accepté qu'après la vérification de son accès par l'appelant.
+ * The shape served for a request. `owner` is the account that reads; `conversationId` is
+ * accepted only after the caller has checked access to it.
  */
 export function shapeSpec(
   name: ShapeName,
@@ -88,7 +88,7 @@ export function shapeSpec(
   }
 }
 
-/** Requête vers Electric : la shape du serveur, les seuls paramètres de synchro du client. */
+/** Request to Electric: the server's shape, only the client's sync parameters. */
 export function upstreamUrl(
   electricUrl: string,
   secret: string | undefined,
@@ -108,8 +108,8 @@ export function upstreamUrl(
 }
 
 /**
- * Réponse d'Electric rendue au client : sans les en-têtes de compression, que `fetch` a déjà
- * défaite, et avec `Vary` pour qu'aucun cache ne resserve la shape d'une autre session.
+ * Electric response returned to the client: without the compression headers, which `fetch` has
+ * already undone, and with `Vary` so that no cache serves the shape of another session again.
  */
 export function proxiedResponse(upstream: Response): Response {
   const headers = new Headers(upstream.headers)

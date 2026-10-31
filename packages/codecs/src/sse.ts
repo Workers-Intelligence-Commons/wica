@@ -1,5 +1,5 @@
-// Décodeur du format « server-sent events » (HTML Living Standard, section 9.2) : un flux de
-// texte découpé en messages par des lignes vides. Pur : les morceaux entrent, les messages sortent.
+// Decoder of the "server-sent events" format (HTML Living Standard, section 9.2): a text stream
+// split into messages by empty lines. Pure: chunks go in, messages come out.
 
 export type SseMessage = { event?: string; data: string; id?: string }
 
@@ -33,21 +33,21 @@ export function createSseDecoder() {
   }
 
   return {
-    /** Ajoute un morceau de texte et rend les messages complets qu'il termine. */
+    /** Adds a text chunk and returns the complete messages it finishes. */
     push(chunk: string): SseMessage[] {
       buffer += chunk
       const out: SseMessage[] = []
       for (;;) {
         const match = /\r\n|\r|\n/.exec(buffer)
         if (!match) break
-        // Un \r en fin de morceau peut être suivi d'un \n dans le suivant : on attend.
+        // A \r at the end of a chunk can be followed by a \n in the next one: wait.
         if (match[0] === '\r' && match.index === buffer.length - 1) break
         line(buffer.slice(0, match.index), out)
         buffer = buffer.slice(match.index + match[0].length)
       }
       return out
     },
-    /** Fin du flux : un message sans ligne vide finale est abandonné, comme le veut la norme. */
+    /** End of the stream: a message without a final empty line is dropped, as the standard requires. */
     end(): SseMessage[] {
       buffer = ''
       data = []

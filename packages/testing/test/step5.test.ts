@@ -1,7 +1,7 @@
-// Porte de l'étape 5 : un serveur MCP configuré par
-// l'hôte se connecte, expose ses outils et se reconnecte après une coupure ; `authorize` voit
-// les annotations ; une demande d'information du serveur passe par la personne ; un skill fourni
-// par l'hôte se charge à la demande. Le serveur MCP est celui du SDK officiel, relié en mémoire.
+// Step 5 gate: an MCP server configured by the host connects, exposes its tools and reconnects
+// after a disconnection; `authorize` sees the annotations; an information request of the server
+// goes through the person; a skill provided by the host loads on demand. The MCP server is the
+// one from the official SDK, linked in memory.
 
 import { InMemoryTransport, McpServer } from '@modelcontextprotocol/server'
 import { type Client, createClient } from '@wica/client'
@@ -21,7 +21,7 @@ import { z } from 'zod'
 
 import { scriptedModel } from '../src/index.ts'
 
-/** Un serveur MCP neuf par connexion ; `cut` coupe la connexion en cours. */
+/** A fresh MCP server per connection; `cut` cuts the current connection. */
 function mcpServer(register: (server: McpServer, cut: () => void) => void) {
   let current: InMemoryTransport | null = null
   let connections = 0
@@ -55,7 +55,7 @@ async function setup(options: HarnessOptions) {
 
 function waitFor(client: Client, ready: () => boolean): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('délai dépassé')), 3000)
+    const timer = setTimeout(() => reject(new Error('timed out')), 3000)
     const check = () => {
       if (!ready()) return
       clearTimeout(timer)
@@ -76,22 +76,22 @@ const results = (path: readonly Item[]) =>
 const textOf = (item: Extract<Item, { kind: 'tool_result' }> | undefined) =>
   item?.output.map((p) => (p.type === 'text' ? p.text : '')).join('')
 
-describe('étape 5', () => {
-  it('expose les outils MCP avec leurs annotations et se reconnecte après une coupure', async () => {
+describe('step 5', () => {
+  it('exposes the MCP tools with their annotations and reconnects after a disconnection', async () => {
     const server = mcpServer((mcp) => {
       mcp.registerTool(
         'lookup',
         {
-          description: 'Cherche une note.',
+          description: 'Searches for a note.',
           inputSchema: z.object({ query: z.string() }),
           annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
         },
-        async ({ query }) => ({ content: [{ type: 'text', text: `Note sur ${query}.` }] }),
+        async ({ query }) => ({ content: [{ type: 'text', text: `Note about ${query}.` }] }),
       )
       mcp.registerTool(
         'delete_note',
-        { description: 'Supprime une note.', inputSchema: z.object({ id: z.string() }) },
-        async ({ id }) => ({ content: [{ type: 'text', text: `Note ${id} supprimée.` }] }),
+        { description: 'Deletes a note.', inputSchema: z.object({ id: z.string() }) },
+        async ({ id }) => ({ content: [{ type: 'text', text: `Note ${id} deleted.` }] }),
       )
     })
     const mcp = await connectMcp([{ name: 'notes', transport: server.transport }])
@@ -100,7 +100,7 @@ describe('étape 5', () => {
     const seen: AuthorizeCall[] = []
     const authorize: Authorize = (call) => {
       seen.push(call)
-      return call.annotations.destructiveHint ? { ask: `Autoriser ${call.tool} ?` } : 'allow'
+      return call.annotations.destructiveHint ? { ask: `Allow ${call.tool}?` } : 'allow'
     }
     const model = scriptedModel((request) => {
       const done = results(request.path)
@@ -112,7 +112,7 @@ describe('étape 5', () => {
         }
       }
       if (done.length === 1) {
-        // La connexion tombe entre deux appels : le suivant doit la rouvrir.
+        // The connection drops between two calls: the next one must reopen it.
         server.cut()
         return {
           parts: [
@@ -120,20 +120,20 @@ describe('étape 5', () => {
           ],
         }
       }
-      return { parts: [{ type: 'text', text: 'Fin.' }] }
+      return { parts: [{ type: 'text', text: 'End.' }] }
     })
     const { harness, client } = await setup({ model, tools: () => mcp.tools(), authorize })
 
-    await client.send('c1', 'Cherche Paris puis supprime la note n1')
+    await client.send('c1', 'Search for Paris, then delete note n1')
     await waitFor(client, () => client.view('c1').waiting.length > 0)
     expect(client.view('c1').waiting[0]).toMatchObject({
       tool: 'approve',
-      input: { question: 'Autoriser notes__delete_note ?' },
+      input: { question: 'Allow notes__delete_note?' },
     })
     await client.answer('c1', client.view('c1').waiting[0]!.callId, true)
-    await waitFor(client, finished(client, 'Fin.'))
+    await waitFor(client, finished(client, 'End.'))
 
-    // `authorize` reçoit les annotations du serveur, et les valeurs par défaut de MCP sinon.
+    // `authorize` receives the annotations of the server, and the MCP default values otherwise.
     expect(seen.map((c) => [c.tool, c.annotations])).toEqual([
       [
         'notes__lookup',
@@ -148,20 +148,20 @@ describe('étape 5', () => {
     const items = (await harness.store.load('c1', 0)).items
     const lookup = results(items).find((r) => r.callId === 'k1')
     const deletion = results(items).find((r) => r.callId === 'k2')
-    expect([textOf(lookup), textOf(deletion)]).toEqual(['Note sur Paris.', 'Note n1 supprimée.'])
+    expect([textOf(lookup), textOf(deletion)]).toEqual(['Note about Paris.', 'Note n1 deleted.'])
     expect([lookup?.isError, deletion?.isError]).not.toContain(true)
-    // Un outil ouvert sur le monde extérieur marque son résultat comme non fiable.
+    // A tool open on the outside world marks its result as untrusted.
     expect(deletion?.meta).toMatchObject({ untrusted: true })
     expect(journalViolations(items)).toEqual([])
     await client.close()
     await mcp.close()
   })
 
-  it('rend un résultat d’erreur quand la connexion tombe pendant un appel, sans faire échouer le tour', async () => {
+  it('returns an error result when the connection drops during a call, without making the turn fail', async () => {
     const server = mcpServer((mcp, cut) => {
       mcp.registerTool(
         'slow',
-        { description: 'Ne répond jamais.', inputSchema: z.object({}) },
+        { description: 'Never answers.', inputSchema: z.object({}) },
         async () => {
           cut()
           return new Promise(() => {})
@@ -172,12 +172,12 @@ describe('étape 5', () => {
     const model = scriptedModel((request) =>
       results(request.path).length === 0
         ? { parts: [{ type: 'tool_call', callId: 'k1', tool: 'notes__slow', input: {} }] }
-        : { parts: [{ type: 'text', text: 'Le serveur ne répond plus.' }] },
+        : { parts: [{ type: 'text', text: 'The server no longer answers.' }] },
     )
     const { harness, client } = await setup({ model, tools: () => mcp.tools() })
 
-    await client.send('c1', 'Lance slow')
-    await waitFor(client, finished(client, 'Le serveur ne répond plus.'))
+    await client.send('c1', 'Run slow')
+    await waitFor(client, finished(client, 'The server no longer answers.'))
     const [result] = results((await harness.store.load('c1', 0)).items)
     expect(result?.isError).toBe(true)
     expect(textOf(result)).toContain('notes/slow')
@@ -185,11 +185,11 @@ describe('étape 5', () => {
     await mcp.close()
   })
 
-  it('reprend un serveur injoignable au démarrage dès qu’il répond', async () => {
+  it('resumes a server unreachable at startup as soon as it answers', async () => {
     const server = mcpServer((mcp) => {
       mcp.registerTool(
         'lookup',
-        { description: 'Cherche.', inputSchema: z.object({}) },
+        { description: 'Searches.', inputSchema: z.object({}) },
         async () => ({
           content: [{ type: 'text', text: 'ok' }],
         }),
@@ -200,7 +200,7 @@ describe('étape 5', () => {
       {
         name: 'notes',
         transport: () => {
-          if (!up) throw new Error('serveur arrêté')
+          if (!up) throw new Error('server stopped')
           return server.transport()
         },
       },
@@ -215,57 +215,57 @@ describe('étape 5', () => {
     await mcp.close()
   })
 
-  it('fait passer une demande d’information du serveur par la personne', async () => {
+  it('passes an information request of the server through the person', async () => {
     const server = mcpServer((mcp) => {
       mcp.registerTool(
         'book',
-        { description: 'Réserve un billet.', inputSchema: z.object({}) },
+        { description: 'Books a ticket.', inputSchema: z.object({}) },
         async (_input, ctx) => {
           const answer = await ctx.mcpReq.elicitInput({
-            message: 'Vers quelle ville ?',
+            message: 'To which city?',
             requestedSchema: {
               type: 'object',
-              properties: { ville: { type: 'string' } },
-              required: ['ville'],
+              properties: { city: { type: 'string' } },
+              required: ['city'],
             },
           })
-          const city = answer.action === 'accept' ? String(answer.content?.['ville'] ?? '') : ''
-          return { content: [{ type: 'text', text: city ? `Billet pour ${city}.` : 'Annulé.' }] }
+          const city = answer.action === 'accept' ? String(answer.content?.['city'] ?? '') : ''
+          return { content: [{ type: 'text', text: city ? `Ticket to ${city}.` : 'Cancelled.' }] }
         },
       )
     })
     const mcp = await connectMcp([{ name: 'notes', transport: server.transport }])
     const model = scriptedModel((request) =>
       results(request.path).some((r) => r.callId === 'k1')
-        ? { parts: [{ type: 'text', text: 'Réservé.' }] }
+        ? { parts: [{ type: 'text', text: 'Booked.' }] }
         : { parts: [{ type: 'tool_call', callId: 'k1', tool: 'notes__book', input: {} }] },
     )
     const { harness, client } = await setup({ model, tools: () => mcp.tools(), renderAnswer })
 
-    await client.send('c1', 'Réserve un billet')
+    await client.send('c1', 'Book a ticket')
     await waitFor(client, () => client.view('c1').waiting.length > 0)
     const [question] = client.view('c1').waiting
     expect(question).toMatchObject({
       tool: 'elicit',
-      input: { server: 'notes', message: 'Vers quelle ville ?' },
+      input: { server: 'notes', message: 'To which city?' },
     })
-    await client.answer('c1', question!.callId, { action: 'accept', content: { ville: 'Lyon' } })
-    await waitFor(client, finished(client, 'Réservé.'))
+    await client.answer('c1', question!.callId, { action: 'accept', content: { city: 'Lyon' } })
+    await waitFor(client, finished(client, 'Booked.'))
 
     const items = (await harness.store.load('c1', 0)).items
     const answer = results(items).find((r) => r.callId === question!.callId)
-    // La réponse compte comme la parole de la personne, dans ses mots.
-    expect(answer).toMatchObject({ as: 'user', output: [{ type: 'text', text: 'ville : Lyon' }] })
-    expect(textOf(results(items).find((r) => r.callId === 'k1'))).toBe('Billet pour Lyon.')
+    // The answer counts as the person's speech, in their words.
+    expect(answer).toMatchObject({ as: 'user', output: [{ type: 'text', text: 'city: Lyon' }] })
+    expect(textOf(results(items).find((r) => r.callId === 'k1'))).toBe('Ticket to Lyon.')
     expect(journalViolations(items)).toEqual([])
     await client.close()
     await mcp.close()
   })
 
-  it('charge un skill fourni par l’hôte quand la tâche y correspond', async () => {
+  it('loads a skill provided by the host when the task matches it', async () => {
     const files: Record<string, string> = {
       'skills/releases/SKILL.md':
-        '---\nname: releases\ndescription: Prépare une publication.\n---\nÉtape 1 : relire le journal.',
+        '---\nname: releases\ndescription: Prepares a release.\n---\nStep 1: read the journal again.',
     }
     const read = async (path: string) => files[path] ?? Promise.reject(new Error(path))
     const skills = skillsKit(await loadSkills(['skills/releases'], read), read)
@@ -276,19 +276,19 @@ describe('étape 5', () => {
               { type: 'tool_call', callId: 'k1', tool: 'load_skill', input: { name: 'releases' } },
             ],
           }
-        : { parts: [{ type: 'text', text: 'Je relis le journal.' }] },
+        : { parts: [{ type: 'text', text: 'Reading the journal again.' }] },
     )
-    const { client } = await setup({ model, skills, instructions: 'Tu aides à publier.' })
+    const { client } = await setup({ model, skills, instructions: 'You help publish.' })
 
-    await client.send('c1', 'Prépare la publication')
-    await waitFor(client, finished(client, 'Je relis le journal.'))
+    await client.send('c1', 'Prepare the release')
+    await waitFor(client, finished(client, 'Reading the journal again.'))
     const [first, second] = model.requests
-    // Au démarrage, le modèle ne voit que le nom et la description ; le corps vient au chargement.
-    expect(first?.instructions).toContain('Tu aides à publier.')
-    expect(first?.instructions).toContain('- releases : Prépare une publication.')
-    expect(first?.instructions).not.toContain('Étape 1')
+    // At startup, the model sees only the name and the description; the body comes at loading.
+    expect(first?.instructions).toContain('You help publish.')
+    expect(first?.instructions).toContain('- releases: Prepares a release.')
+    expect(first?.instructions).not.toContain('Step 1')
     expect(first?.tools.map((t) => t.name)).toContain('load_skill')
-    expect(textOf(results(second!.path)[0])).toBe('Étape 1 : relire le journal.')
+    expect(textOf(results(second!.path)[0])).toBe('Step 1: read the journal again.')
     await client.close()
   })
 })

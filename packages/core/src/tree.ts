@@ -2,7 +2,7 @@ import type { Item, ItemDraft } from './journal.ts'
 
 type Node = Item | ItemDraft
 
-/** Chemin de la racine jusqu'à `head` : la vue affichée d'une conversation. */
+/** Path from the root to `head`: the displayed view of a conversation. */
 export function pathTo<T extends Node>(items: readonly T[], head: string | null): T[] {
   const byId = new Map(items.map((i) => [i.id, i]))
   const path: T[] = []
@@ -17,15 +17,15 @@ export function pathTo<T extends Node>(items: readonly T[], head: string | null)
   return path.reverse()
 }
 
-/** Violations des invariants du journal ; une liste vide veut dire un journal valide. */
+/** Violations of the journal invariants; an empty list means a valid journal. */
 export function journalViolations(items: readonly Item[]): string[] {
   const out: string[] = []
   const byId = new Map<string, Item>()
   let lastSeq = -Infinity
   for (const item of items) {
-    if (byId.has(item.id)) out.push(`identifiant en double : ${item.id}`)
+    if (byId.has(item.id)) out.push(`duplicate identifier: ${item.id}`)
     byId.set(item.id, item)
-    if (item.seq <= lastSeq) out.push(`seq non croissant : ${item.id}`)
+    if (item.seq <= lastSeq) out.push(`seq not increasing: ${item.id}`)
     lastSeq = item.seq
   }
   const results = new Map<string, number>()
@@ -33,19 +33,19 @@ export function journalViolations(items: readonly Item[]): string[] {
     if (item.parentId !== null) {
       const parent = byId.get(item.parentId)
       if (!parent) out.push(`parent absent : ${item.id}`)
-      else if (parent.seq >= item.seq) out.push(`parent postérieur : ${item.id}`)
+      else if (parent.seq >= item.seq) out.push(`parent comes later: ${item.id}`)
     }
     if (item.kind === 'tool_result') {
       results.set(item.callId, (results.get(item.callId) ?? 0) + 1)
       const onPath = pathTo(items, item.id)
       if (!onPath.some((i) => i.kind === 'tool_call' && i.callId === item.callId)) {
-        out.push(`résultat sans appel sur son chemin : ${item.id}`)
+        out.push(`result without a call on its path: ${item.id}`)
       }
     }
   }
-  for (const [callId, n] of results) if (n > 1) out.push(`plusieurs résultats : ${callId}`)
-  // Un appel sans résultat ne peut être suivi, sur son chemin, d'une nouvelle réponse du modèle :
-  // une entrée (message, résultat, événement externe) puis une sortie du modèle.
+  for (const [callId, n] of results) if (n > 1) out.push(`several results: ${callId}`)
+  // A call without a result cannot be followed, on its path, by a new model response: an input
+  // (message, result, external event) then a model output.
   for (const leaf of items) {
     const path = pathTo(items, leaf.id)
     if (path.length === 0 || path[path.length - 1]?.id !== leaf.id) continue
@@ -54,7 +54,7 @@ export function journalViolations(items: readonly Item[]): string[] {
     for (const i of path) {
       if (i.kind === 'assistant_text' || i.kind === 'reasoning' || i.kind === 'tool_call') {
         if (inputSinceOutput && open.size > 0) {
-          out.push(`appel sans résultat avant un nouvel appel au modèle : ${[...open].join(', ')}`)
+          out.push(`call without a result before a new model call: ${[...open].join(', ')}`)
           break
         }
         inputSinceOutput = false

@@ -1,6 +1,6 @@
-/* Feuille du chat : les tokens et les composants du design system, puis la mise en page propre au
-   chat, dessinée avec les mêmes tokens. Les zones qui se remplissent après coup gardent une
-   taille réservée, pour que la page ne saute pas. */
+/* Chat stylesheet: the design system tokens and components, then the layout specific to the
+   chat, drawn with the same tokens. Areas that fill in afterwards keep a reserved size, so that
+   the page does not jump. */
 
 @import '@workers-intelligence-commons/tokens/tokens.css';
 @import '@workers-intelligence-commons/components/styles.css';
@@ -46,7 +46,7 @@ pre {
   white-space: nowrap;
 }
 
-/* Erreur d'une action : réservée, pour que la page ne saute pas quand elle paraît. */
+/* Error of an action: reserved, so that the page does not jump when it appears. */
 .failure {
   min-height: 24px;
   margin: 0;
@@ -58,7 +58,7 @@ pre {
   color: var(--red-ink);
 }
 
-/* Mise en page : la barre latérale des conversations et la zone principale. */
+/* Layout: the conversation sidebar and the main area. */
 
 .app {
   display: grid;
@@ -209,7 +209,7 @@ pre {
   cursor: not-allowed;
 }
 
-/* Nouvelle conversation */
+/* New conversation */
 
 .start {
   justify-content: flex-end;
@@ -227,7 +227,7 @@ pre {
   padding: var(--space-4) var(--space-4) 0;
 }
 
-/* Connexion */
+/* Login */
 
 .login {
   display: grid;
@@ -241,7 +241,7 @@ pre {
   width: min(420px, 100%);
 }
 
-/* Réglages */
+/* Settings */
 
 .settings {
   flex: 1;

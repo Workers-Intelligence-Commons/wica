@@ -1,6 +1,6 @@
-// Chiffrement des jetons de modèle (AES-GCM, clé de l'instance), signature des cookies de
-// session (HMAC-SHA-256) et empreintes des clés d'API et des jetons de serveur. Tout passe par
-// WebCrypto, présent sur Node comme sur Workers.
+// Encryption of model tokens (AES-GCM, instance key), signing of session cookies (HMAC-SHA-256),
+// and hashes of API keys and server tokens. Everything goes through WebCrypto, present on Node
+// as on Workers.
 
 export type InstanceKey = { id: string; key: CryptoKey }
 
@@ -24,14 +24,14 @@ export async function sha256Hex(text: string): Promise<string> {
   return [...digest].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-/** Jeton aléatoire de 32 octets, avec un préfixe qui dit ce qu'il ouvre. */
+/** Random 32-byte token, with a prefix that says what it opens. */
 export const randomToken = (prefix: string) =>
   `${prefix}_${toBase64Url(crypto.getRandomValues(new Uint8Array(32)))}`
 
-/** Clé de l'instance, donnée en base64 (32 octets) ; son identifiant suit une rotation. */
+/** Instance key, given in base64 (32 bytes); its identifier follows a rotation. */
 export async function instanceKey(base64: string): Promise<InstanceKey> {
   const raw = fromBase64Url(base64.trim())
-  if (raw.length !== 32) throw new Error('La clé de l’instance doit faire 32 octets en base64.')
+  if (raw.length !== 32) throw new Error('The instance key must be 32 bytes in base64.')
   const key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
   return { id: (await sha256Hex(base64.trim())).slice(0, 16), key }
 }
@@ -45,7 +45,7 @@ export async function encrypt(key: InstanceKey, plaintext: string) {
 }
 
 export async function decrypt(key: InstanceKey, sealed: { ciphertext: string; key_id: string }) {
-  if (sealed.key_id !== key.id) throw new Error('Jeton chiffré avec une autre clé de l’instance.')
+  if (sealed.key_id !== key.id) throw new Error('Token encrypted with another instance key.')
   const [iv = '', data = ''] = sealed.ciphertext.split('.')
   const plain = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: fromBase64Url(iv) },
@@ -61,7 +61,7 @@ const hmacKey = (secret: string) =>
     'verify',
   ])
 
-/** Valeur signée : `données.signature`, en base64url. */
+/** Signed value: `data.signature`, in base64url. */
 export async function sign(secret: string, value: unknown): Promise<string> {
   const body = toBase64Url(encoder.encode(JSON.stringify(value)))
   const mac = new Uint8Array(
@@ -70,7 +70,7 @@ export async function sign(secret: string, value: unknown): Promise<string> {
   return `${body}.${toBase64Url(mac)}`
 }
 
-/** La valeur d'origine, ou `null` si la signature ne correspond pas ; la comparaison est celle de WebCrypto. */
+/** The original value, or `null` if the signature does not match; the comparison is WebCrypto's. */
 export async function verify<T>(secret: string, signed: string): Promise<T | null> {
   const [body, mac] = signed.split('.')
   if (!body || !mac) return null

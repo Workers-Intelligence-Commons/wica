@@ -12,40 +12,40 @@ const base = {
 }
 
 describe('configuration', () => {
-  it('lit le mode d’amorçage par défaut', () => {
+  it('reads bootstrap mode by default', () => {
     expect(readConfig(base)).toMatchObject({
       auth: { kind: 'bootstrap' },
       electricUrl: 'http://electric:3000',
     })
   })
 
-  // Une instance mal configurée ne doit pas démarrer à moitié : le message nomme la variable.
-  it('arrête le démarrage en nommant la valeur manquante', () => {
+  // A misconfigured instance must not start halfway: the message names the variable.
+  it('stops startup by naming the missing value', () => {
     expect(() => readConfig({ ...base, WICA_SESSION_SECRET: '' })).toThrow(/WICA_SESSION_SECRET/)
     expect(() => readConfig({ ...base, WICA_AUTH: 'oidc' })).toThrow(/OIDC_ISSUER/)
     expect(() => readConfig({ ...base, WICA_MODEL_URL: 'http://m/v1' })).toThrow(ConfigError)
   })
 })
 
-describe('modèle d’une conversation', () => {
-  it('lit le modèle par défaut et un modèle hébergé', () => {
+describe('model of a conversation', () => {
+  it('reads the default model and a hosted model', () => {
     expect(parseModelChoice(null)).toEqual({ kind: 'default' })
     expect(parseModelChoice('pi:anthropic/claude-opus-5-5')).toEqual({
       kind: 'pi',
       provider: 'anthropic',
       model: 'claude-opus-5-5',
     })
-    expect(parseModelChoice('autre')).toBeNull()
+    expect(parseModelChoice('other')).toBeNull()
   })
 
-  it('lit un faux modèle et refuse un nom inconnu', () => {
+  it('reads a fake model and refuses an unknown name', () => {
     expect(parseModelChoice('lorem:lorem-tools')).toEqual({ kind: 'lorem', model: 'lorem-tools' })
-    expect(parseModelChoice('lorem:autre')).toBeNull()
+    expect(parseModelChoice('lorem:other')).toBeNull()
   })
 
-  // Une vraie instance ne doit jamais répondre du lorem : sans la variable, le faux modèle est refusé.
-  it('ne sert les faux modèles que si WICA_TEST_MODELS vaut 1', () => {
-    expect(() => readConfig({ ...base, WICA_TEST_MODELS: 'oui' })).toThrow(/WICA_TEST_MODELS/)
+  // A real instance must never answer with lorem: without the variable, the fake model is refused.
+  it('serves the fake models only if WICA_TEST_MODELS is 1', () => {
+    expect(() => readConfig({ ...base, WICA_TEST_MODELS: 'yes' })).toThrow(/WICA_TEST_MODELS/)
     const lorem = { kind: 'lorem', model: 'lorem' } as const
     const unused = undefined as never
     expect(() => conversationModel(readConfig(base), unused, unused, 'u', lorem)).toThrow(
@@ -57,9 +57,9 @@ describe('modèle d’une conversation', () => {
   })
 })
 
-describe('réveils sur Cloudflare Queues', () => {
-  // Queues refuse un délai de plus de 24 h : un réveil plus lointain part au plus tard, puis est relayé.
-  it('borne le délai d’un réveil lointain à la limite de Queues', async () => {
+describe('wake-ups on Cloudflare Queues', () => {
+  // Queues refuses a delay longer than 24 h: a later wake-up leaves at the latest time, then is relayed.
+  it('caps the delay of a distant wake-up at the Queues limit', async () => {
     const sent: unknown[] = []
     const scheduler = queueScheduler({
       send: async (body, options) => void sent.push([body, options]),

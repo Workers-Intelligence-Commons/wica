@@ -1,7 +1,7 @@
-// Connexions MCP : le paquet initialise la connexion à chaque
-// serveur configuré par l'hôte, négocie la version, expose ses outils comme des `Tool`, se
-// reconnecte après une coupure et ne laisse jamais une connexion cassée faire échouer un tour.
-// Ce fichier n'utilise que des API web standard ; le lancement de serveurs locaux est dans `./node`.
+// MCP connections: the package initializes the connection to each server configured by the host,
+// negotiates the version, exposes its tools as `Tool`s, reconnects after a disconnection, and
+// never lets a broken connection make a turn fail.
+// This file uses only standard web APIs; launching local servers is in `./node`.
 
 import {
   Client,
@@ -14,30 +14,30 @@ import type { Part, ToolAnnotations } from '@wica/core'
 import type { CredentialStore, Tool, ToolContext } from '@wica/runtime'
 
 export type McpServerConfig = {
-  /** Nom du serveur : il préfixe ses outils (`<nom>__<outil>`). */
+  /** Server name: it prefixes its tools (`<name>__<tool>`). */
   name: string
-  /** Adresse HTTP du serveur (transport Streamable HTTP). */
+  /** HTTP address of the server (Streamable HTTP transport). */
   url?: string
-  /** Transport fourni par l'hôte, par exemple `stdioServer` de `./node` ; prioritaire sur `url`. */
+  /** Transport provided by the host, for example `stdioServer` from `./node`; takes priority over `url`. */
   transport?: () => Transport
   /**
-   * Identifiant du serveur dans le `CredentialStore` de l'hôte : le jeton est lu à chaque requête
-   * et envoyé en `Authorization: Bearer`, jamais pris dans la configuration ni dans le journal.
+   * Identifier of the server in the host `CredentialStore`: the token is read at each request and
+   * sent in `Authorization: Bearer`, never taken from the configuration or from the journal.
    */
   credential?: { store: CredentialStore; key: string }
   headers?: Record<string, string>
-  /** Outils autorisés ; absent : tous. */
+  /** Allowed tools; absent: all of them. */
   allow?: string[]
-  /** Outils refusés, appliqués après `allow`. */
+  /** Refused tools, applied after `allow`. */
   deny?: string[]
 }
 
 export type McpOptions = {
-  /** Identité annoncée aux serveurs. */
+  /** Identity announced to the servers. */
   clientInfo?: { name: string; version: string }
 }
 
-/** Valeurs par défaut des annotations dans la spécification MCP. */
+/** Default values of the annotations in the MCP specification. */
 const DEFAULT_ANNOTATIONS: Required<Omit<ToolAnnotations, 'title'>> = {
   readOnlyHint: false,
   destructiveHint: true,
@@ -46,8 +46,8 @@ const DEFAULT_ANNOTATIONS: Required<Omit<ToolAnnotations, 'title'>> = {
 }
 
 /**
- * Annotations complétées par les valeurs par défaut. MCP ne donne un sens à `destructiveHint` que
- * pour un outil qui écrit : un outil en lecture seule n'est donc jamais destructif.
+ * Annotations completed with the default values. MCP gives `destructiveHint` a meaning only for a
+ * tool that writes: a read-only tool is therefore never destructive.
  */
 export function annotations(declared: ToolAnnotations = {}): ToolAnnotations {
   const merged = { ...DEFAULT_ANNOTATIONS, ...declared }
@@ -79,7 +79,7 @@ async function dataPart(data: string, mediaType: string): Promise<Part> {
   return { type: 'file', uri: `data:${mediaType};base64,${data}`, mediaType, sha256 }
 }
 
-/** Contenu d'un résultat MCP vers les parties du journal. */
+/** Content of an MCP result, turned into journal parts. */
 export async function toParts(result: {
   content?: unknown[]
   structuredContent?: unknown
@@ -95,7 +95,7 @@ export async function toParts(result: {
         parts.push(await dataPart(block.data, block.mimeType))
         break
       case 'resource_link':
-        parts.push({ type: 'text', text: `Ressource : ${block.name ?? block.uri} (${block.uri})` })
+        parts.push({ type: 'text', text: `Resource: ${block.name ?? block.uri} (${block.uri})` })
         break
       case 'resource':
         if (block.resource.text !== undefined)
@@ -120,8 +120,8 @@ export async function toParts(result: {
 type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
 
 /**
- * Requêtes vers un serveur MCP avec son jeton. Un refus `401` fait rafraîchir le jeton une fois,
- * sous l'exclusion mutuelle du `CredentialStore`, puis rejoue la requête.
+ * Requests to an MCP server with its token. A `401` refusal makes the token refresh once, under
+ * the mutual exclusion of the `CredentialStore`, then replays the request.
  */
 export function authorizedFetch(
   base: Fetch,
@@ -148,7 +148,7 @@ export function authorizedFetch(
   }
 }
 
-/** Une connexion cassée : l'outil concerné renvoie un résultat d'erreur. */
+/** A broken connection: the affected tool returns an error result. */
 export class McpConnectionError extends Error {
   override name = 'McpConnectionError'
 }
@@ -160,7 +160,7 @@ class Connection {
   #connecting: Promise<Client> | null = null
   #tools: McpTool[] = []
   #closed = false
-  /** Appels en cours : une demande d'information va au plus récent. */
+  /** Calls in progress: an information request goes to the most recent one. */
   readonly #running: ToolContext[] = []
 
   constructor(config: McpServerConfig, options: McpOptions) {
@@ -175,7 +175,7 @@ class Connection {
   #transport(): Transport {
     if (this.config.transport) return this.config.transport()
     if (!this.config.url)
-      throw new McpConnectionError(`serveur MCP ${this.config.name} sans adresse`)
+      throw new McpConnectionError(`MCP server ${this.config.name} has no address`)
     return new StreamableHTTPClientTransport(new URL(this.config.url), {
       fetch: authorizedFetch(fetch, this.config.credential, this.config.headers),
     })
@@ -190,9 +190,9 @@ class Connection {
       : { action: 'decline' }
   }
 
-  /** Connexion, à la demande ; une seule tentative à la fois. */
+  /** Connection, on demand; only one attempt at a time. */
   async client(): Promise<Client> {
-    if (this.#closed) throw new McpConnectionError(`serveur MCP ${this.config.name} fermé`)
+    if (this.#closed) throw new McpConnectionError(`MCP server ${this.config.name} closed`)
     if (this.#client) return this.#client
     if (this.#connecting) return this.#connecting
     this.#connecting = (async () => {
@@ -203,7 +203,7 @@ class Connection {
           tools: {
             onChanged: (error, tools) => {
               if (error || !tools) return
-              // Lu au tour suivant par `tools()` ; le cœur écrit alors `tools_changed`.
+              // Read at the next turn by `tools()`; the core then writes `tools_changed`.
               this.#tools = tools as McpTool[]
             },
           },
@@ -216,13 +216,13 @@ class Connection {
       try {
         await client.connect(this.#transport())
         this.#tools = (await client.listTools()).tools as McpTool[]
-        if (this.#closed) throw new Error('fermé pendant la connexion')
+        if (this.#closed) throw new Error('closed during the connection')
         this.#client = client
         return client
       } catch (error) {
         await client.close().catch(() => {})
         throw new McpConnectionError(
-          `Connexion au serveur MCP ${this.config.name} impossible : ${error instanceof Error ? error.message : String(error)}`,
+          `Connection to the MCP server ${this.config.name} failed: ${error instanceof Error ? error.message : String(error)}`,
         )
       } finally {
         this.#connecting = null
@@ -231,7 +231,7 @@ class Connection {
     return this.#connecting
   }
 
-  /** Relance en arrière-plan la connexion d'un serveur déconnecté, sans retarder le tour. */
+  /** Restarts in the background the connection of a disconnected server, without delaying the turn. */
   revive() {
     if (!this.#closed && !this.#client && !this.#connecting)
       void this.client().catch(() => undefined)
@@ -240,8 +240,8 @@ class Connection {
   async call(name: string, input: unknown, ctx: ToolContext): Promise<Part[]> {
     this.#running.push(ctx)
     try {
-      // Une connexion tombée entre deux appels est rouverte ici ; une seconde coupure pendant
-      // l'appel devient un résultat d'erreur, sans relance : l'effet a peut-être eu lieu.
+      // A connection dropped between two calls is reopened here; a second disconnection during
+      // the call becomes an error result, without a retry: the effect may have happened.
       const client = await this.client()
       let result
       try {
@@ -251,13 +251,13 @@ class Connection {
         )
       } catch (error) {
         throw new McpConnectionError(
-          `Appel MCP ${this.config.name}/${name} interrompu : ${error instanceof Error ? error.message : String(error)}`,
+          `MCP call ${this.config.name}/${name} interrupted: ${error instanceof Error ? error.message : String(error)}`,
         )
       }
       const parts = await toParts(result)
       if (result.isError) {
         throw new Error(
-          parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n') || 'Erreur MCP.',
+          parts.map((p) => (p.type === 'text' ? p.text : '')).join('\n') || 'MCP error.',
         )
       }
       return parts
@@ -274,7 +274,7 @@ class Connection {
 }
 
 export type McpConnections = {
-  /** Outils de tous les serveurs joignables, dans un ordre stable. */
+  /** Tools of all reachable servers, in a stable order. */
   tools(): Tool[]
   close(): Promise<void>
 }
@@ -285,9 +285,9 @@ function allowed(config: McpServerConfig, name: string) {
 }
 
 /**
- * Connecte les serveurs configurés. Un serveur injoignable ne bloque pas les autres : chaque
- * `tools()` relance sa connexion en arrière-plan, et ses outils apparaissent au tour qui suit
- * une connexion réussie.
+ * Connects the configured servers. An unreachable server does not block the others: each
+ * `tools()` restarts its connection in the background, and its tools appear at the turn that
+ * follows a successful connection.
  */
 export async function connectMcp(
   servers: McpServerConfig[],

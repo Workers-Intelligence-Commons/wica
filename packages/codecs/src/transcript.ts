@@ -1,28 +1,28 @@
-// Rendu du chemin actif commun à tous les formats d'API : ce que le modèle lit, dans l'ordre, sans la forme d'un fournisseur.
-// Chaque codec traduit ces entrées dans son format et garde pour lui le tri des données opaques.
+// Rendering of the active path shared by all API formats: what the model reads, in order, without the shape of a provider.
+// Each codec translates these entries into its format and keeps the sorting of opaque data to itself.
 
 import { compactPath, HARNESS_TOOLS, type Item, type ModelRequest, type Part } from '@wica/core'
 
 export type TranscriptEntry =
-  /** Entrée lue comme une parole : une personne, un événement externe, un réveil. */
+  /** Entry read as speech: a person, an external event, a wake-up. */
   | { type: 'user'; parts: Part[] }
-  /** Consigne du Harness à sa place dans la conversation : résumé, reprise de branche. */
+  /** Harness instruction at its place in the conversation: summary, branch resume. */
   | { type: 'developer'; text: string }
   | { type: 'assistant_text'; text: string }
   | { type: 'reasoning'; text?: string; opaque?: { provider: string; data: unknown } }
   | { type: 'tool_call'; callId: string; tool: string; input: unknown }
   | { type: 'tool_result'; callId: string; tool: string; output: Part[]; isError: boolean }
 
-/** Résultat d'outil minimal qui précède la parole de la personne (Paroles de la personne). */
-export const USER_REPLY_ACK = 'Réponse de la personne reçue ; elle suit.'
+/** Minimal tool result that precedes the person's speech (Person's speech). */
+export const USER_REPLY_ACK = 'Answer from the person received; it follows.'
 
-/** Consigne d'une requête de résumé : ce dont la suite du travail a besoin, rien d'autre. */
+/** Instruction of a summary request: what the rest of the work needs, nothing else. */
 export const SUMMARY_PROMPT =
-  'Résume la conversation ci-dessus pour la suite du travail : demandes de la personne, faits établis, décisions prises, actions faites sur l’environnement et leurs résultats, questions ouvertes. Écris seulement le résumé, sans appeler d’outil.'
+  'Summarize the conversation above for the rest of the work: requests from the person, established facts, decisions made, actions taken on the environment and their results, open questions. Write only the summary, without calling a tool.'
 
 const text = (t: string): Part[] => [{ type: 'text', text: t }]
 
-/** Les appels ajoutés par le Harness lui-même (approbations, questions d'outils) ne viennent pas du modèle. */
+/** Calls added by the Harness itself (approvals, tool questions) do not come from the model. */
 const fromHarness = (item: Item, own: Set<string>) =>
   (item.kind === 'tool_call' && item.channel === 'user' && HARNESS_TOOLS.includes(item.tool)) ||
   (item.kind === 'tool_result' && own.has(item.callId))
@@ -30,20 +30,20 @@ const fromHarness = (item: Item, own: Set<string>) =>
 const externalEvent = (item: Extract<Item, { kind: 'external_event' }>): TranscriptEntry => ({
   type: 'user',
   parts: text(
-    `Événement externe (source : ${item.source}, nom : ${item.name}, confiance : ${item.trust}) :\n${JSON.stringify(item.data)}`,
+    `External event (source: ${item.source}, name: ${item.name}, trust: ${item.trust}):\n${JSON.stringify(item.data)}`,
   ),
 })
 
 /**
- * Un réveil que l'agent s'est donné. Sa charge vient du modèle, parfois après une entrée non
- * fiable : elle arrive comme une entrée, jamais avec l'autorité des consignes.
+ * A wake-up the agent gave itself. Its payload comes from the model, sometimes after an untrusted
+ * input: it arrives as an input, never with the authority of instructions.
  */
 function wakeupFired(data: unknown): TranscriptEntry {
   const d = (data ?? {}) as { id?: string; at?: string; payload?: unknown }
   return {
     type: 'user',
     parts: text(
-      `Réveil programmé (identifiant : ${d.id ?? '?'}, prévu pour ${d.at ?? '?'}) :\n${JSON.stringify(d.payload ?? null)}`,
+      `Scheduled wake-up (identifier: ${d.id ?? '?'}, due at ${d.at ?? '?'}):\n${JSON.stringify(d.payload ?? null)}`,
     ),
   }
 }
@@ -52,13 +52,13 @@ function branchResumed(data: unknown): TranscriptEntry {
   const calls = (data as { callIds?: string[] } | null)?.callIds ?? []
   return {
     type: 'developer',
-    text: `La conversation reprend une branche plus ancienne. L'environnement a pu changer depuis${
-      calls.length > 0 ? ` (appels faits sur une autre branche : ${calls.join(', ')})` : ''
-    } : observe-le de nouveau avant d'agir sur ce que tu crois savoir.`,
+    text: `The conversation resumes an older branch. The environment may have changed since${
+      calls.length > 0 ? ` (calls made on another branch: ${calls.join(', ')})` : ''
+    }: observe it again before acting on what you believe you know.`,
   }
 }
 
-/** Chemin actif, compacté, vers les entrées que le modèle lit. */
+/** Active path, compacted, to the entries the model reads. */
 export function toTranscript(request: ModelRequest): TranscriptEntry[] {
   const path = compactPath(request.path)
   const approvals = new Set(
@@ -70,8 +70,8 @@ export function toTranscript(request: ModelRequest): TranscriptEntry[] {
   )
   const out: TranscriptEntry[] = []
   const tools = new Map<string, string>()
-  // Résultats d'outils en attente de rendu : ils sortent dans l'ordre des appels, puis les paroles
-  // de la personne dans le même ordre, dès qu'un autre élément les suit.
+  // Tool results waiting to be rendered: they come out in the order of the calls, then the
+  // person's speech in the same order, as soon as another item follows them.
   const callOrder: string[] = []
   let results: Extract<Item, { kind: 'tool_result' }>[] = []
   const flush = () => {
@@ -95,7 +95,7 @@ export function toTranscript(request: ModelRequest): TranscriptEntry[] {
   for (const item of path) {
     if (item.kind === 'summary') {
       flush()
-      out.push({ type: 'developer', text: `Résumé de la conversation jusqu'ici :\n${item.text}` })
+      out.push({ type: 'developer', text: `Summary of the conversation so far:\n${item.text}` })
       continue
     }
     if (fromHarness(item, approvals)) continue

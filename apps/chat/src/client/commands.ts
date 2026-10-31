@@ -1,7 +1,7 @@
-// Commandes du navigateur : enveloppes du protocole client envoyées par `POST /api/commands`.
-// Un message s'affiche tout de suite (insertion optimiste avec l'identifiant que le serveur
-// calculera), puis il est confirmé quand sa ligne revient par la synchro, ou annulé si l'API le
-// refuse. L'écriture ne passe jamais par Electric.
+// Browser commands: client protocol envelopes sent through `POST /api/commands`. A message shows
+// up right away (optimistic insertion with the identifier the server will compute), then it is
+// confirmed when its row comes back through the sync, or cancelled if the API refuses it.
+// Writing never goes through Electric.
 
 import { createTransaction } from '@tanstack/react-db'
 import { isChangeMessage } from '@tanstack/electric-db-collection'
@@ -11,7 +11,7 @@ import type { Command, Envelope } from '@wica/protocol'
 import { markPending } from './cache.ts'
 import type { ItemShapeRow } from './collections.ts'
 
-/** Attente de la confirmation par la synchro, au-delà de laquelle l'envoi est annulé. */
+/** Wait for confirmation through the sync, beyond which the send is cancelled. */
 const CONFIRM_TIMEOUT_MS = 30_000
 
 export class CommandError extends Error {
@@ -40,7 +40,7 @@ const tabState = () => {
 
 let tab: ReturnType<typeof tabState> | null = null
 
-/** Enveloppe d'une commande, numérotée dans l'ordre de cet onglet. */
+/** Envelope of a command, numbered in the order of this tab. */
 export function envelope(
   conversationId: string,
   command: Command,
@@ -57,7 +57,7 @@ export function envelope(
   }
 }
 
-/** Envoie une enveloppe ; un rejeu du même `commandId` rend la même réponse. */
+/** Sends an envelope; a replay of the same `commandId` returns the same response. */
 export async function postCommand(env: Envelope): Promise<{ ok: boolean; deposited?: boolean }> {
   tab ??= tabState()
   const harness = tab.harnessSession()
@@ -90,15 +90,15 @@ type AwaitMatch = (
   timeout?: number,
 ) => Promise<boolean>
 
-/** Collection des éléments ; `awaitMatch` vient de la collection Electric du navigateur. */
+/** Collection of items; `awaitMatch` comes from the browser's Electric collection. */
 type ItemsCollection = {
   insert(row: ItemShapeRow): unknown
   utils: Record<string, unknown>
 }
 
 /**
- * Envoie un message : ligne optimiste dans la collection, commande, puis attente de la ligne
- * écrite par le serveur. Rend l'identifiant du message.
+ * Sends a message: optimistic row in the collection, command, then wait for the row written by
+ * the server. Returns the message identifier.
  */
 export async function sendMessage(options: {
   items: ItemsCollection
@@ -107,7 +107,7 @@ export async function sendMessage(options: {
   salt: string
   parentId: string | null
   parts: Part[]
-  /** `seq` provisoire, après le dernier élément connu. */
+  /** Provisional `seq`, after the last known item. */
   seq: number
 }): Promise<string> {
   const from = { channel: 'web', author: options.account }

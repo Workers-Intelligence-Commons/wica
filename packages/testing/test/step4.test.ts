@@ -1,5 +1,5 @@
-// Porte de l'étape 4 : coupure du transport et reprise
-// depuis un `seq` sans doublon, rejeu d'une commande par identifiant, sur un vrai WebSocket.
+// Step 4 gate: transport disconnection and resume from a `seq` without duplicates, replay of a
+// command by identifier, over a real WebSocket.
 
 import { type Client, createClient, deriveView } from '@wica/client'
 import type { AssistantMessage, ModelRequest } from '@wica/core'
@@ -11,7 +11,7 @@ import { describe, expect, it } from 'vite-plus/test'
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-/** Modèle qui écrit sa réponse mot par mot, avec une pause entre deux mots. */
+/** Model that writes its response word by word, with a pause between two words. */
 function slowModel(
   words: string[],
   onDelta?: (n: number) => void,
@@ -34,7 +34,7 @@ function slowModel(
 
 function until(client: Client, ready: () => boolean, ms = 3000): Promise<void> {
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('délai dépassé')), ms)
+    const timer = setTimeout(() => reject(new Error('timed out')), ms)
     const check = () => {
       if (!ready()) return
       clearTimeout(timer)
@@ -52,9 +52,9 @@ const finalText = (client: Client) =>
     .entries.flatMap((e) => (e.type === 'assistant' && !e.streaming ? [e.text] : []))
     .at(-1)
 
-describe('étape 4', () => {
-  it('reprend après une coupure en plein flux, sans doublon, avec la vue du journal complet', async () => {
-    const words = Array.from({ length: 30 }, (_, i) => `mot${i} `)
+describe('step 4', () => {
+  it('resumes after a disconnection in the middle of the stream, without duplicates, with the view of the full journal', async () => {
+    const words = Array.from({ length: 30 }, (_, i) => `word${i} `)
     let drop = () => {}
     const harness = createHarness({
       model: slowModel(words, (n) => n === 10 && drop()),
@@ -71,11 +71,11 @@ describe('étape 4', () => {
     const client = createClient(transport, { from: { channel: 'local' } })
     await client.connect()
     await client.subscribe('c1')
-    await client.send('c1', 'Écris trente mots')
+    await client.send('c1', 'Write thirty words')
 
     await until(client, () => finalText(client) === words.join(''))
     const { items, head } = await harness.store.load('c1', 0)
-    // Oracle : la vue du client égale celle calculée depuis le journal complet du serveur.
+    // Oracle: the client view equals the one computed from the full server journal.
     expect(client.view('c1').entries).toEqual(deriveView(items, head).entries)
     expect(new Set(items.map((i) => i.id)).size).toBe(items.length)
     expect(reopened).toBeGreaterThan(0)
@@ -83,12 +83,12 @@ describe('étape 4', () => {
     await listening.close()
   })
 
-  it('rejoue une commande dont l’accusé est perdu, et le serveur ne l’exécute qu’une fois', async () => {
-    const model = slowModel(['Bonjour.'])
+  it('replays a command whose acknowledgement is lost, and the server runs it only once', async () => {
+    const model = slowModel(['Hello.'])
     const harness = createHarness({ model, policy: { freeText: 'direct' } })
     let dropped = false
     const listening = await listenWebSocket({ port: 0, host: '127.0.0.1' }, (t) => {
-      // La première commande arrive au serveur, puis la connexion tombe avant l'accusé.
+      // The first command reaches the server, then the connection drops before the acknowledgement.
       const cut: ServerTransport = {
         ...t,
         async *receive() {
@@ -109,8 +109,8 @@ describe('étape 4', () => {
     )
     await client.connect()
     await client.subscribe('c1')
-    await client.send('c1', 'Salut')
-    await until(client, () => finalText(client) === 'Bonjour.')
+    await client.send('c1', 'Hi')
+    await until(client, () => finalText(client) === 'Hello.')
 
     expect(dropped).toBe(true)
     const { items } = await harness.store.load('c1', 0)

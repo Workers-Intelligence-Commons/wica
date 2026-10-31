@@ -2,7 +2,7 @@ import type { Item } from './journal.ts'
 
 export type JSONSchema = Record<string, unknown> | boolean
 
-/** Vocabulaire des annotations d'outils de MCP. */
+/** Vocabulary of MCP tool annotations. */
 export type ToolAnnotations = {
   title?: string
   readOnlyHint?: boolean
@@ -31,16 +31,16 @@ export type AssistantPart =
 export type AssistantMessage = { parts: AssistantPart[]; raw?: string }
 
 export type ModelRequest = {
-  /** Identifiant de l'élément auquel le modèle répond. */
+  /** Identifier of the item the model answers. */
   trigger: string
-  /** Chemin actif, de la racine à la tête. */
+  /** Active path, from the root to the head. */
   path: Item[]
   tools: ToolSpec[]
-  /** Consignes de l'hôte pour le modèle, hors du journal. */
+  /** Host instructions for the model, outside the journal. */
   instructions?: string
   /**
-   * Requête de résumé : le modèle résume `path` sans outils, et son texte devient l'événement
-   * `compacted` de cette plage au lieu d'une réponse.
+   * Summary request: the model summarizes `path` without tools, and its text becomes the
+   * `compacted` event of this range instead of a response.
    */
   summarize?: { from: string; to: string }
 }
@@ -50,33 +50,33 @@ export type ToolCall = {
   tool: string
   input: unknown
   channel: 'environment' | 'user'
-  /** Vrai quand la personne a déjà accordé cet appel : l'hôte ne redemande pas `authorize`. */
+  /** True when the person has already granted this call: the host does not ask `authorize` again. */
   approved?: boolean
 }
 
-/** Outil du canal utilisateur qui porte une demande d'approbation dans le journal. */
+/** User channel tool that carries an approval request in the journal. */
 export const APPROVAL_TOOL = 'approve'
 
-/** `callId` de la demande d'approbation liée à un appel d'outil. */
+/** `callId` of the approval request linked to a tool call. */
 export const approvalCallId = (callId: string) => `approve:${callId}`
 
 /**
- * Outil du canal utilisateur qui porte une question posée par un outil en cours, par exemple la
- * demande d'information d'un serveur MCP. Sa réponse revient à l'outil qui attend.
+ * User channel tool that carries a question asked by a running tool, for example the information
+ * request of an MCP server. Its answer goes back to the waiting tool.
  */
 export const ELICIT_TOOL = 'elicit'
 
-/** `callId` de la question `n` posée pendant l'appel `callId`. */
+/** `callId` of the question `n` asked during the call `callId`. */
 export const elicitCallId = (callId: string, n: number) => `elicit:${callId}:${n}`
 
-/** Outil intégré qui prévoit un réveil de la conversation (une fois ou récurrent). */
+/** Built-in tool that schedules a wake-up of the conversation (once or recurring). */
 export const SCHEDULE_TOOL = 'schedule'
 
-/** Outil intégré qui annule un réveil prévu. */
+/** Built-in tool that cancels a scheduled wake-up. */
 export const CANCEL_WAKEUP_TOOL = 'cancel_wakeup'
 
-/** Outils que le Harness ajoute lui-même au journal : le modèle ne les a jamais appelés. */
+/** Tools the Harness adds to the journal itself: the model never called them. */
 export const HARNESS_TOOLS: readonly string[] = [APPROVAL_TOOL, ELICIT_TOOL]
 
-/** Appel du canal utilisateur en attente de la personne. */
+/** User channel call waiting for the person. */
 export type Question = ToolCall

@@ -1,7 +1,7 @@
-// Contrôle des licences de production de chaque paquet contre la liste `allowed` ci-dessous.
-// license-checker ne suit pas les espaces de travail depuis la racine : il est lancé par paquet.
-// `license-clarifications.json` donne la licence d'un paquet qui ne la déclare pas, vérifiée par
-// l'empreinte de son fichier de licence.
+// Check of the production licenses of each package against the `allowed` list below.
+// license-checker does not follow the workspaces from the root: it runs per package.
+// `license-clarifications.json` gives the license of a package that does not declare it, checked
+// by the hash of its license file.
 import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -51,9 +51,9 @@ for (const family of ['packages', 'apps']) {
         ],
         { stdio: ['ignore', 'ignore', 'inherit'] },
       )
-      console.log(`licences conformes : ${dir}`)
+      console.log(`licenses compliant: ${dir}`)
     } catch {
-      console.error(`licence refusée dans ${dir}`)
+      console.error(`license refused in ${dir}`)
       failed = true
     }
   }

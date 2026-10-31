@@ -1,4 +1,4 @@
-// Les suites de conformité sur les implémentations du dépôt.
+// The conformance suites on the repository implementations.
 
 import { PassThrough } from 'node:stream'
 
@@ -24,7 +24,7 @@ import {
 storeConformance('MemoryStore', () => new MemoryStore())
 storeConformance('resilientStore', () => resilientStore(new MemoryStore()))
 
-transportConformance('mémoire', async () => memoryTransportPair())
+transportConformance('memory', async () => memoryTransportPair())
 
 transportConformance('stdio', async () => {
   const up = new PassThrough()
@@ -40,7 +40,7 @@ transportConformance('WebSocket', async () => {
   const server = new Promise<ServerTransport>((resolve) => (accepted = resolve))
   const listening = await listenWebSocket({ port: 0, host: '127.0.0.1' }, accepted)
   const client = connectWebSocket(`ws://127.0.0.1:${listening.port}`)
-  // La connexion ne s'ouvre qu'au premier envoi ou à la première lecture du client.
+  // The connection opens only at the first send or the first read of the client.
   void client.send({ kind: 'ping' })
   const transport = await server
   const frames = transport.receive()[Symbol.asyncIterator]()
@@ -53,15 +53,12 @@ transportConformance('WebSocket', async () => {
 })
 
 const scenarios: Record<ModelScenario, (signal: AbortSignal | null | undefined) => Response> = {
-  text: () => openResponsesStream([openResponsesMessage('Bonjour.')]),
+  text: () => openResponsesStream([openResponsesMessage('Hello.')]),
   tool_call: () => openResponsesStream([openResponsesCall('k1', 'read_file', { path: 'a.txt' })]),
   failure: () =>
-    new Response(
-      JSON.stringify({ error: { message: 'modèle inconnu', code: 'model_not_found' } }),
-      {
-        status: 404,
-      },
-    ),
+    new Response(JSON.stringify({ error: { message: 'unknown model', code: 'model_not_found' } }), {
+      status: 404,
+    }),
   endless: (signal) => endlessOpenResponsesStream(signal),
 }
 

@@ -1,11 +1,11 @@
-// Format du journal de conversation.
+// Conversation journal format.
 
 export type Trust = 'owner' | 'known' | 'untrusted'
 
-/** D'où vient une entrée. */
+/** Where an input comes from. */
 export type Origin = { channel: string; author?: string; trust: Trust }
 
-/** À qui s'adresse une sortie. */
+/** Whom an output is addressed to. */
 export type Destination = { channel: string; recipient?: string }
 
 export type Part =
@@ -26,7 +26,7 @@ export type EventName =
   | 'wakeup_fired'
   | 'wakeup_cancelled'
   | 'regenerate'
-  /** Un appel d'outil autorisé est confié au client qui l'exécute (`data: { callId }`). */
+  /** An allowed tool call is delegated to the client that runs it (`data: { callId }`). */
   | 'handed'
 
 export type ItemBody =
@@ -63,7 +63,7 @@ type ItemHeader = {
 
 export type Item = ItemHeader & ItemBody
 
-/** Un élément pas encore persisté : le `Store` lui attribue son `seq`. */
+/** An item not yet persisted: the `Store` assigns its `seq`. */
 export type ItemDraft = Omit<ItemHeader, 'seq'> & ItemBody
 
 export type Wakeup = { id: string; at: string; every?: string; payload: unknown }

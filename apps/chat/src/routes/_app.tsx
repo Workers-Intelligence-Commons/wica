@@ -1,5 +1,5 @@
-// Mise en page des pages connectées : la barre latérale (conversations) et la zone principale.
-// La coque part tout de suite ; la liste arrive dans sa propre frontière de chargement.
+// Layout of the logged-in pages: the sidebar (conversations) and the main area. The shell is
+// sent right away; the list arrives in its own loading boundary.
 
 import { eq, isNull, useLiveSuspenseQuery } from '@tanstack/react-db'
 import { createFileRoute, Link, Outlet, redirect, useParams } from '@tanstack/react-router'
@@ -65,8 +65,8 @@ function Conversations({ owner }: { owner: string }) {
         .orderBy(({ c }) => c.updated_at, 'desc'),
   })
   const params = useParams({ strict: false }) as { conversationId?: string }
-  // Seules les lignes apparues après le premier rendu s'animent : au retour, le cache s'affiche
-  // tel quel.
+  // Only the rows that appeared after the first render animate: on return, the cache shows as
+  // it is.
   const initial = useRef<Set<string> | null>(null)
   initial.current ??= new Set(data.map((c) => c.id))
   return (

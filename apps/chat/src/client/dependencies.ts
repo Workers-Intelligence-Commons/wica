@@ -1,5 +1,5 @@
-// Dépendances du `DbClient` du navigateur : le compte et les fichiers du cache déjà ouverts.
-// Un fichier s'ouvre en asynchrone ; une collection ne lit que ceux qui le sont déjà.
+// Dependencies of the browser `DbClient`: the account and the cache files already opened. A file
+// opens asynchronously; a collection reads only the files that already are open.
 
 import { openCache, type CachePersistence } from './cache.ts'
 import type { BrowserDependencies } from './collections.ts'
@@ -11,7 +11,7 @@ export function setBrowserCaches(id: string) {
   account = id
 }
 
-/** Ouvre un fichier et le rend lisible par les collections créées ensuite. */
+/** Opens a file and makes it readable by the collections created afterwards. */
 export async function prepareCache(name: string) {
   ready.set(name, await openCache(name))
 }

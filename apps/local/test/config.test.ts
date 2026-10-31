@@ -4,14 +4,14 @@ import { ConfigError, configFromEnv } from '../src/server.ts'
 
 const rest = { root: '/tmp', allowAll: false }
 
-describe('modèle du binaire local', () => {
-  it('accepte un faux modèle sans adresse de service', () => {
+describe('model of the local binary', () => {
+  it('accepts a fake model without a service address', () => {
     const config = configFromEnv({ WICA_MODEL: 'lorem-tools' }, rest)
     expect(config.model).toBe('lorem-tools')
     expect(config.modelUrl).toBeUndefined()
   })
 
-  it('exige une adresse pour tout autre modèle', () => {
+  it('requires an address for any other model', () => {
     expect(() => configFromEnv({ WICA_MODEL: 'qwen' }, rest)).toThrow(ConfigError)
     expect(
       configFromEnv({ WICA_MODEL: 'lorem', WICA_MODEL_URL: 'http://m/v1' }, rest),

@@ -1,6 +1,7 @@
-// Serveur distant du chat : le Harness de cette machine, avec ses outils, suit la boîte de
-// commandes du chat par une connexion sortante et écrit ses éléments par l'API du chat. Rien
-// n'entre sur cette machine ; le chat a déjà vérifié chaque commande et l'accès à sa conversation.
+// Remote server of the chat: the Harness of this machine, with its tools, follows the chat's
+// command inbox through an outgoing connection and writes its items through the chat API.
+// Nothing enters this machine; the chat has already checked each command and the access to its
+// conversation.
 
 import { httpStore, chatInbox, whoami, type RemoteOptions } from '@wica/chat-remote'
 import { type ClientAuth, type Harness, resilientStore } from '@wica/runtime'
@@ -8,7 +9,7 @@ import { inboxTransport } from '@wica/transport-inbox'
 
 import { createLocalServer, type LocalConfig } from './server.ts'
 
-/** Les messages du navigateur sont signés du compte propriétaire : même origine, même identifiant. */
+/** Browser messages are signed by the owner account: same origin, same identifier. */
 export function remoteAuth(ownerId: string): ClientAuth {
   return {
     authenticate: async () => ({

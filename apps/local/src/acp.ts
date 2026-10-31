@@ -1,7 +1,7 @@
-// Mode ACP du binaire local : l'éditeur lance `wica acp` et parle l'Agent Client Protocol sur
-// l'entrée et la sortie standard. Le Harness tourne dans le même processus ; l'adaptateur en est
-// un client, comme la ligne de commande. Les fichiers et le terminal sont ceux de l'éditeur, et
-// les serveurs MCP que l'éditeur passe à la session s'ajoutent à ses outils.
+// ACP mode of the local binary: the editor launches `wica acp` and speaks the Agent Client
+// Protocol over standard input and output. The Harness runs in the same process; the adapter is
+// one of its clients, like the command line. The files and the terminal are the editor's, and
+// the MCP servers the editor passes to the session are added to its tools.
 
 import { type AcpSession, acpAgent, editorTools } from '@wica/acp'
 import { stdioStream } from '@wica/acp/node'
@@ -14,11 +14,11 @@ import { memoryTransportPair } from '@wica/transport-memory'
 
 import { createLocalServer, type LocalConfig } from './server.ts'
 
-const INSTRUCTIONS = `Tu travailles dans un éditeur de code : ses fichiers et son terminal sont tes outils, et les chemins relatifs partent du dossier de travail de la session. Parle à la personne avec l'outil say, et pose tes questions avec ask_user.`
+const INSTRUCTIONS = `You work in a code editor: its files and its terminal are your tools, and relative paths start from the working folder of the session. Speak to the person with the say tool, and ask your questions with ask_user.`
 
 type Mcp = Awaited<ReturnType<typeof connectMcp>>
 
-/** Serveurs MCP de l'éditeur : stdio, que tout agent ACP doit accepter, et HTTP, annoncé. */
+/** MCP servers of the editor: stdio, which every ACP agent must accept, and HTTP, announced. */
 function mcpServers(session: AcpSession): McpServerConfig[] {
   return session.mcpServers.flatMap((server): McpServerConfig[] => {
     if (!('type' in server)) {
@@ -43,13 +43,13 @@ function mcpServers(session: AcpSession): McpServerConfig[] {
         },
       ]
     }
-    // SSE n'est pas annoncé à l'initialisation : l'éditeur ne devrait pas en envoyer.
-    process.stderr.write(`wica : serveur MCP ${server.name} ignoré (transport ${server.type}).\n`)
+    // SSE is not announced at initialization: the editor should not send any.
+    process.stderr.write(`wica: MCP server ${server.name} ignored (transport ${server.type}).\n`)
     return []
   })
 }
 
-/** Sert une session ACP jusqu'à ce que l'éditeur ferme la connexion. */
+/** Serves an ACP session until the editor closes the connection. */
 export async function serveAcp(config: LocalConfig) {
   const sessions = new Map<string, { tools: Tool[]; mcp: Mcp }>()
   const harness = createLocalServer(config, {

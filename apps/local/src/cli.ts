@@ -1,6 +1,6 @@
-// Client en ligne de commande : affiche la conversation au fil du flux, pose les questions et
-// les approbations au clavier, et envoie les messages tapés. Ctrl-C interrompt un tour en cours,
-// ou quitte quand rien ne tourne.
+// Command-line client: shows the conversation as it streams, asks questions and approvals at
+// the keyboard, and sends the typed messages. Ctrl-C interrupts a turn in progress, or quits
+// when nothing is running.
 
 import { createInterface } from 'node:readline'
 import type { Readable, Writable } from 'node:stream'
@@ -31,7 +31,7 @@ export function runCli(
   io: { input: Readable; output: Writable },
 ): Promise<void> {
   const rl = createInterface({ input: io.input, output: io.output, prompt: '> ' })
-  // L'invite n'est réaffichée qu'après une sortie ou une saisie, pas à chaque changement.
+  // The prompt is shown again only after an output or an input, not at every change.
   let prompted = false
   const write = (text: string) => {
     prompted = false
@@ -43,7 +43,7 @@ export function runCli(
   let lineWaiter: ((line: string) => void) | null = null
   let asking = false
   let busy = false
-  // Un envoi reste en cours jusqu'à ce que le serveur ait annoncé un tour, puis sa fin.
+  // A send stays in progress until the server has announced a turn, then its end.
   let sawRunning = false
   let streamingOpen = false
 
@@ -67,7 +67,7 @@ export function runCli(
       return client.answer(conversationId, call.callId, yes)
     }
     if (call.tool === ELICIT_TOOL) {
-      // Demande d'un serveur MCP : la personne peut refuser d'y répondre.
+      // Request from an MCP server: the person can refuse to answer it.
       const input = call.input as {
         server: string
         message: string
@@ -75,9 +75,9 @@ export function runCli(
         url?: string
         requestedSchema?: unknown
       }
-      const where = input.mode === 'url' ? `\nAdresse : ${input.url ?? ''}` : ''
+      const where = input.mode === 'url' ? `\nAddress: ${input.url ?? ''}` : ''
       const agree = await askUntil(
-        `[${input.server}] ${input.message}${where}\nRépondre ? [o/n]`,
+        `[${input.server}] ${input.message}${where}\nAnswer? [y/n]`,
         parseYesNo,
       )
       if (!agree) {
@@ -134,14 +134,14 @@ export function runCli(
           shown.add(entry.result.id)
           if (entry.result.isError) {
             const first = entry.result.output[0]
-            write(`[${entry.call.tool}] erreur : ${first?.type === 'text' ? first.text : ''}\n`)
+            write(`[${entry.call.tool}] error: ${first?.type === 'text' ? first.text : ''}\n`)
           }
         }
       }
     }
     if (view.error && !shown.has(`error:${view.error}`)) {
       shown.add(`error:${view.error}`)
-      write(`Erreur : ${view.error}\n`)
+      write(`Error: ${view.error}\n`)
     }
     const question = view.waiting.find((c) => !answered.has(c.callId))
     if (question && !asking) {
@@ -174,13 +174,13 @@ export function runCli(
         lineWaiter = null
         return waiter(line)
       }
-      if (busy) return write('(un tour tourne ; Ctrl-C pour l’interrompre)\n')
+      if (busy) return write('(a turn is running; Ctrl-C to interrupt it)\n')
       const text = line.trim()
       if (text === '') return rl.prompt()
       if (text === '/quit') return rl.close()
       busy = true
       void client.send(conversationId, text).catch((e: unknown) => {
-        write(`Envoi impossible : ${String(e)}\n`)
+        write(`Send failed: ${String(e)}\n`)
         busy = false
         rl.prompt()
       })

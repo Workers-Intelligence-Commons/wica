@@ -1,5 +1,5 @@
-// Question posée à la personne : approbation d'un outil, `ask_user` sous ses quatre formes, ou
-// demande d'un serveur MCP. La réponse part par la commande `answer`.
+// Question asked to the person: approval of a tool, `ask_user` in its four forms, or a request
+// from an MCP server. The answer leaves through the `answer` command.
 
 import { ELICIT_TOOL, type Item } from '@wica/core'
 import type { AskUserAnswer, AskUserInput, ElicitAnswer } from '@wica/tools-user'
@@ -223,7 +223,7 @@ type Field = {
   required: boolean
 }
 
-/** Champs simples d'un schéma de demande MCP (propriétés de premier niveau). */
+/** Simple fields of an MCP request schema (top-level properties). */
 function elicitFields(schema: unknown): Field[] {
   const s = schema as {
     properties?: Record<string, { type?: string; title?: string }>

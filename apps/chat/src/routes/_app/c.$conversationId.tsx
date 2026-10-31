@@ -1,6 +1,6 @@
-// Une conversation : le chemin affiché de son arbre, en direct. Les éléments et leurs lots
-// viennent des collections synchronisées ; les commandes partent par l'API. Le défilement colle
-// en bas pendant le flux seulement si la personne y était déjà.
+// A conversation: the displayed path of its tree, live. The items and their batches come from
+// the synchronized collections; commands leave through the API. Scrolling sticks to the bottom
+// during streaming only if the person was already there.
 
 import { eq, useDbClient, useLiveQuery, useLiveSuspenseQuery } from '@tanstack/react-db'
 import { createFileRoute, notFound } from '@tanstack/react-router'
@@ -29,7 +29,7 @@ import { prepareCache } from '../../client/dependencies.ts'
 import { branchesOf, conversationView, leafUnder } from '../../client/view.ts'
 import { Question } from '../../ui/Question.tsx'
 
-/** Sans battement de cœur depuis ce délai, un serveur distant est dit hors ligne. */
+/** Without a heartbeat for this long, a remote server is said to be offline. */
 const OFFLINE_AFTER_MS = 45_000
 
 export const Route = createFileRoute('/_app/c/$conversationId')({
@@ -111,7 +111,7 @@ function Conversation({ conversationId }: { conversationId: string }) {
   const offline =
     conversation.server_id !== null &&
     (!server?.last_seen_at || now - Date.parse(server.last_seen_at) > OFFLINE_AFTER_MS)
-  // Une réponse en flux compte déjà comme la réponse : `settled` est vrai pendant le flux.
+  // A streaming response already counts as the response: `settled` is true during streaming.
   const running = !view.settled || view.items.some((i) => i.status === 'streaming')
 
   const run = async (action: () => Promise<unknown>) => {
@@ -182,7 +182,7 @@ function Conversation({ conversationId }: { conversationId: string }) {
                         variant="quiet"
                         disabled={entry.item.parentId === null}
                         onClick={() => {
-                          // Une autre réponse à ce à quoi la réponse répondait : sa sœur.
+                          // Another response to what the response was answering: its sibling.
                           const answered = entry.item.parentId
                           if (answered)
                             void run(() =>

@@ -1,4 +1,4 @@
-// Outils et autorisation.
+// Tools and authorization.
 
 import {
   CANCEL_WAKEUP_TOOL,
@@ -15,26 +15,26 @@ import {
 export type ToolContext = {
   callId: string
   signal: AbortSignal
-  /** Message de progression vers le client, jamais vers le modèle. */
+  /** Progress message to the client, never to the model. */
   progress: (message: string) => void
-  /** Chemin actif, en lecture seule. */
+  /** Active path, read-only. */
   path: readonly Item[]
   /**
-   * Pose une question à la personne pendant l'outil (demande d'information d'un serveur MCP) et
-   * rend sa réponse. La question passe par le canal utilisateur ; la réponse compte comme sa parole.
+   * Asks the person a question during the tool (information request of an MCP server) and returns
+   * their answer. The question goes through the user channel; the answer counts as their speech.
    */
   ask: (input: unknown) => Promise<unknown>
 }
 
 export type Tool = {
   spec: ToolSpec
-  /** Absent : l'outil est seulement déclaré et s'exécute ailleurs. */
+  /** Absent: the tool is only declared and runs elsewhere. */
   run?: (input: unknown, ctx: ToolContext) => Promise<Part[]>
 }
 
 type Issue = { message: string; path?: readonly (PropertyKey | { key: PropertyKey })[] }
 
-/** Schéma conforme à Standard Schema et à Standard JSON Schema (Zod, Valibot, ArkType…). */
+/** Schema conforming to Standard Schema and to Standard JSON Schema (Zod, Valibot, ArkType…). */
 export type StandardToolSchema<I = unknown, O = I> = {
   readonly '~standard': {
     readonly version: 1
@@ -70,11 +70,11 @@ type ToolDefinition<O> = {
 const asParts = (out: Part[] | string): Part[] =>
   typeof out === 'string' ? [{ type: 'text', text: out }] : out
 
-/** Un outil : un nom, une description, un schéma et une fonction. */
+/** A tool: a name, a description, a schema and a function. */
 export function defineTool<O>(
   definition: ToolDefinition<O> & { input: StandardToolSchema<unknown, O> },
 ): Tool
-/** Variante en JSON Schema brut (outils MCP) : la validation revient à celui qui exécute. */
+/** Raw JSON Schema variant (MCP tools): validation is up to whoever runs it. */
 export function defineTool(definition: ToolDefinition<unknown> & { input: JSONSchema }): Tool
 export function defineTool(
   definition: ToolDefinition<unknown> & { input: StandardToolSchema | JSONSchema },
@@ -103,9 +103,9 @@ export function defineTool(
       if (standard) {
         const result = await standard.validate(input)
         if (result.issues) {
-          // Un échec de validation devient un résultat d'erreur pour le modèle, jamais une exception.
+          // A validation failure becomes an error result for the model, never an exception.
           throw new ToolInputError(
-            `Arguments invalides : ${result.issues.map((i) => i.message).join(' ; ')}`,
+            `Invalid arguments: ${result.issues.map((i) => i.message).join('; ')}`,
           )
         }
         value = result.value
@@ -118,9 +118,9 @@ export function defineTool(
 export type AuthorizeDecision = 'allow' | 'deny' | { deny: string } | { ask: string }
 
 export type AuthorizeContext = {
-  /** Confiance de l'entrée qui a déclenché le tour. */
+  /** Trust of the input that triggered the turn. */
   trust: Trust
-  /** Vrai quand un client est attaché à la conversation. */
+  /** True when a client is attached to the conversation. */
   attached: boolean
 }
 
@@ -131,26 +131,25 @@ export type Authorize = (
   ctx: AuthorizeContext,
 ) => AuthorizeDecision | Promise<AuthorizeDecision>
 
-/** Tout est autorisé : le choix est visible dans le code de l'hôte. */
+/** Everything is allowed: the choice is visible in the host code. */
 export const allowAll: Authorize = () => 'allow'
 
-/** Seuls les outils en lecture seule passent. */
+/** Only read-only tools pass. */
 export const readOnlyOnly: Authorize = (call) =>
-  call.annotations.readOnlyHint
-    ? 'allow'
-    : { deny: 'Seuls les outils en lecture seule sont autorisés.' }
+  call.annotations.readOnlyHint ? 'allow' : { deny: 'Only read-only tools are allowed.' }
 
 /**
- * Valeurs par défaut de MCP : sans annotation, un outil est destructif et touche le monde
- * ouvert ; un outil en lecture seule n'est jamais destructif.
+ * MCP default values: without an annotation, a tool is destructive and touches the open world; a
+ * read-only tool is never destructive.
  */
 export const isDestructive = (a: ToolAnnotations) =>
   a.readOnlyHint !== true && a.destructiveHint !== false
 export const isOpenWorld = (a: ToolAnnotations) => a.openWorldHint !== false
 
 /**
- * Agent sans personne : ce qui est destructif ou touche le monde ouvert attend l'approbation de
- * l'approbateur désigné ; le reste passe. Avec `approvalTimeoutMs`, le silence vaut refus.
+ * Agent without a person: whatever is destructive or touches the open world waits for the
+ * approval of the designated approver; the rest passes. With `approvalTimeoutMs`, silence counts
+ * as a refusal.
  */
 export const unattended: Authorize = (call) =>
   isDestructive(call.annotations) || isOpenWorld(call.annotations)
@@ -158,26 +157,26 @@ export const unattended: Authorize = (call) =>
     : 'allow'
 
 /**
- * Outils de réveil, fournis par le Harness : le cœur les exécute en écrivant le réveil dans le
- * journal, et l'hôte réveille la conversation à l'heure dite par son `Scheduler`.
+ * Wake-up tools, provided by the Harness: the core runs them by writing the wake-up into the
+ * journal, and the host wakes the conversation at the stated time through its `Scheduler`.
  */
 export const scheduleTools: Tool[] = [
   {
     spec: {
       name: SCHEDULE_TOOL,
       description:
-        'Prévoit un réveil de cette conversation, à une date (at) ou après un délai (inSeconds), une fois ou tous les every. Au réveil, tu reçois payload et tu reprends seul.',
+        'Schedules a wake-up of this conversation, at a date (at) or after a delay (inSeconds), once or every `every`. At the wake-up, you receive payload and you resume on your own.',
       inputSchema: {
         type: 'object',
         properties: {
-          at: { type: 'string', description: 'Date ISO 8601.' },
-          inSeconds: { type: 'number', minimum: 0, description: 'Délai en secondes.' },
+          at: { type: 'string', description: 'ISO 8601 date.' },
+          inSeconds: { type: 'number', minimum: 0, description: 'Delay in seconds.' },
           every: {
             type: 'string',
             description:
-              'Récurrence, durée ISO 8601 en jours, heures, minutes ou secondes (PT15M, P1D).',
+              'Recurrence, ISO 8601 duration in days, hours, minutes or seconds (PT15M, P1D).',
           },
-          payload: { description: 'Ce que tu veux te rappeler au réveil.' },
+          payload: { description: 'What you want to remind yourself of at the wake-up.' },
         },
         additionalProperties: false,
       },
@@ -193,7 +192,7 @@ export const scheduleTools: Tool[] = [
   {
     spec: {
       name: CANCEL_WAKEUP_TOOL,
-      description: 'Annule un réveil prévu, désigné par son identifiant.',
+      description: 'Cancels a scheduled wake-up, designated by its identifier.',
       inputSchema: {
         type: 'object',
         properties: { id: { type: 'string' } },

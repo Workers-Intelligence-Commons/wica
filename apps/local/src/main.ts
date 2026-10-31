@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// Binaire local autonome (topologie « tout local ») :
-//   wica                          client en ligne de commande, serveur lancé par stdio
-//   wica serve --stdio            sert le protocole client sur stdin et stdout
+// Standalone local binary ("all local" topology):
+//   wica                          command-line client, server launched over stdio
+//   wica serve --stdio            serves the client protocol on stdin and stdout
 //   wica serve --ws [--port N] [--host H] [--token T]
-//   wica connect <url> --token T  client vers un serveur WebSocket
-//   wica acp                      agent pour un éditeur, par l'Agent Client Protocol sur stdio
-//   wica remote <url>             serveur distant d'un chat, jeton dans WICA_CHAT_TOKEN
+//   wica connect <url> --token T  client to a WebSocket server
+//   wica acp                      agent for an editor, through the Agent Client Protocol on stdio
+//   wica remote <url>             remote server of a chat, token in WICA_CHAT_TOKEN
 
 import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
@@ -23,17 +23,17 @@ import { runCli } from './cli.ts'
 import { serveRemote } from './remote.ts'
 import { ConfigError, configFromEnv, createLocalServer } from './server.ts'
 
-const USAGE = `Utilisation :
+const USAGE = `Usage:
   wica [--yes] [--conversation ID]
   wica serve --stdio [--yes]
-  wica serve --ws [--port 7777] [--host 127.0.0.1] [--token JETON] [--yes]
-  wica connect ws://hôte:port --token JETON [--conversation ID]
+  wica serve --ws [--port 7777] [--host 127.0.0.1] [--token TOKEN] [--yes]
+  wica connect ws://host:port --token TOKEN [--conversation ID]
   wica acp [--yes]
-  WICA_CHAT_TOKEN=JETON wica remote https://chat.example.org [--yes]
+  WICA_CHAT_TOKEN=TOKEN wica remote https://chat.example.org [--yes]
 
-Modèle : WICA_MODEL_URL, WICA_MODEL, WICA_API_KEY (facultatif), WICA_REASONING_EFFORT (facultatif).
-Sans serveur de modèle : WICA_MODEL=lorem (texte écrit à l'avance) ou lorem-tools (un outil à chaque tour).
---yes autorise tous les outils sans demander ; sinon toute action qui n'est pas une lecture demande l'accord.`
+Model: WICA_MODEL_URL, WICA_MODEL, WICA_API_KEY (optional), WICA_REASONING_EFFORT (optional).
+Without a model server: WICA_MODEL=lorem (text written in advance) or lorem-tools (one tool at each turn).
+--yes allows every tool without asking; otherwise every action that is not a read asks for approval.`
 
 async function main(argv: string[]) {
   const { values, positionals } = parseArgs({
@@ -57,30 +57,30 @@ async function main(argv: string[]) {
     configFromEnv(process.env, { root: process.cwd(), allowAll: values.yes === true })
 
   if (command === 'acp') {
-    // stdout porte ACP : rien d'autre ne doit y être écrit.
+    // stdout carries ACP: nothing else must be written there.
     await serveAcp(config())
     return
   }
 
   if (command === 'remote') {
-    if (!target) throw new ConfigError('remote demande l’adresse du chat.')
+    if (!target) throw new ConfigError('remote needs the address of the chat.')
     const token = process.env.WICA_CHAT_TOKEN
     if (!token)
       throw new ConfigError(
-        'WICA_CHAT_TOKEN est requis : jeton donné par le chat à la création du serveur.',
+        'WICA_CHAT_TOKEN is required: token given by the chat when the server is created.',
       )
     const { serverId, done } = await serveRemote(config(), { url: target, token }, (message) => {
-      process.stderr.write(`le chat refuse ce serveur : ${message}\n`)
+      process.stderr.write(`the chat refuses this server: ${message}\n`)
       process.exit(1)
     })
-    process.stderr.write(`serveur ${serverId} relié à ${target}, dossier ${process.cwd()}\n`)
+    process.stderr.write(`server ${serverId} linked to ${target}, folder ${process.cwd()}\n`)
     await done
     return
   }
 
   if (command === 'serve') {
     if (values.stdio) {
-      // stdout porte le protocole : rien d'autre ne doit y être écrit.
+      // stdout carries the protocol: nothing else must be written there.
       await createLocalServer(config()).serve(serveStdio())
       return
     }
@@ -92,21 +92,21 @@ async function main(argv: string[]) {
         (transport) => void harness.serve(transport),
       )
       process.stderr.write(
-        `wica écoute sur ws://${values.host ?? '127.0.0.1'}:${listening.port}\njeton d'appairage : ${token}\n`,
+        `wica listening on ws://${values.host ?? '127.0.0.1'}:${listening.port}\npairing token: ${token}\n`,
       )
       return
     }
-    throw new ConfigError('serve demande --stdio ou --ws.')
+    throw new ConfigError('serve needs --stdio or --ws.')
   }
 
   let transport: ClientTransport
   let token: string | undefined
   if (command === 'connect') {
-    if (!target) throw new ConfigError('connect demande une adresse ws://.')
+    if (!target) throw new ConfigError('connect needs a ws:// address.')
     transport = connectWebSocket(target)
     token = values.token
   } else if (command === undefined) {
-    config() // échoue tôt si le modèle n'est pas configuré
+    config() // fails early if the model is not configured
     const self = fileURLToPath(import.meta.url)
     transport = spawnStdio(process.execPath, [
       self,
@@ -115,7 +115,7 @@ async function main(argv: string[]) {
       ...(values.yes ? ['--yes'] : []),
     ])
   } else {
-    throw new ConfigError(`commande inconnue : ${command}\n\n${USAGE}`)
+    throw new ConfigError(`unknown command: ${command}\n\n${USAGE}`)
   }
 
   const client = createClient(transport, {

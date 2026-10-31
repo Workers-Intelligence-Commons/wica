@@ -1,11 +1,11 @@
-// Faux modèle et faux outils pour les tests.
+// Fake model and fake tools for the tests.
 
 import type { AssistantMessage, Item, ModelRequest } from '@wica/core'
 import type { ModelAdapter, ModelChunk, Tool } from '@wica/runtime'
 
 /**
- * Faux modèle scripté : `respond` choisit la réponse depuis la requête, et chaque partie de
- * texte est envoyée en deux deltas avant la réponse complète.
+ * Scripted fake model: `respond` chooses the response from the request, and each text part is
+ * sent in two deltas before the full response.
  */
 export function scriptedModel(
   respond: (request: ModelRequest) => AssistantMessage,
@@ -31,16 +31,16 @@ export function scriptedModel(
   }
 }
 
-/** Dernier élément du chemin envoyé au modèle. */
+/** Last item of the path sent to the model. */
 export const lastItem = (request: ModelRequest): Item | undefined =>
   request.path[request.path.length - 1]
 
-/** Faux système de fichiers en mémoire, avec un outil de lecture. */
+/** Fake in-memory file system, with a read tool. */
 export function memoryFiles(files: Record<string, string>): Tool {
   return {
     spec: {
       name: 'read_file',
-      description: 'Lit un fichier texte.',
+      description: 'Reads a text file.',
       inputSchema: {
         type: 'object',
         properties: { path: { type: 'string' } },
@@ -52,7 +52,7 @@ export function memoryFiles(files: Record<string, string>): Tool {
     run: async (input) => {
       const path = (input as { path: string }).path
       const content = files[path]
-      if (content === undefined) throw new Error(`Fichier absent : ${path}`)
+      if (content === undefined) throw new Error(`File missing: ${path}`)
       return [{ type: 'text', text: content }]
     },
   }

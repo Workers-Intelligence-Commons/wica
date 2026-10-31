@@ -1,5 +1,5 @@
-// Contexte d'une requête côté serveur : l'instance du chat et la requête, lus par le rendu
-// serveur (préchargement des lignes) sans les passer de fonction en fonction.
+// Context of a server-side request: the chat instance and the request, read by server rendering
+// (row preloading) without passing them from function to function.
 
 import { AsyncLocalStorage } from 'node:async_hooks'
 
@@ -13,6 +13,6 @@ export const withScope = <T>(scope: RequestScope, fn: () => T): T => storage.run
 
 export function currentScope(): RequestScope {
   const scope = storage.getStore()
-  if (!scope) throw new Error('Aucune requête en cours : appel hors du serveur du chat.')
+  if (!scope) throw new Error('No request in progress: call outside the chat server.')
   return scope
 }

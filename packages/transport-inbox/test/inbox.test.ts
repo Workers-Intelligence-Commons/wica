@@ -13,14 +13,14 @@ const envelope = (n: number): Envelope => ({
 })
 
 describe('inboxTransport', () => {
-  // Après une coupure, la boîte est relue depuis le dernier curseur : rien n'est livré deux fois.
-  it('reprend au curseur après une coupure et rend les accusés à la boîte', async () => {
+  // After a disconnection, the inbox is read again from the last cursor: nothing is delivered twice.
+  it('resumes at the cursor after a disconnection and returns the acknowledgements to the inbox', async () => {
     const inbox = new MemoryCommandInbox()
-    const transport = inboxTransport(inbox, { token: 'jeton', baseDelayMs: 5, heartbeatMs: 1000 })
+    const transport = inboxTransport(inbox, { token: 'token', baseDelayMs: 5, heartbeatMs: 1000 })
     const frames = transport.receive()[Symbol.asyncIterator]()
     const next = async () => (await frames.next()).value as ClientFrame
 
-    expect(await next()).toEqual({ kind: 'hello', version: 1, token: 'jeton' })
+    expect(await next()).toEqual({ kind: 'hello', version: 1, token: 'token' })
     inbox.deposit(envelope(1))
     expect(await next()).toEqual(envelope(1))
 
@@ -31,11 +31,11 @@ describe('inboxTransport', () => {
     expect(await next()).toEqual(envelope(2))
 
     await transport.send({ kind: 'ack', commandId: 'cmd-1', ok: true })
-    await transport.send({ kind: 'ack', commandId: 'cmd-2', ok: false, error: 'refusé' })
+    await transport.send({ kind: 'ack', commandId: 'cmd-2', ok: false, error: 'refused' })
     await new Promise((r) => setTimeout(r, 10))
     expect([...inbox.acks]).toEqual([
       ['cmd-1', { ok: true }],
-      ['cmd-2', { ok: false, error: 'refusé' }],
+      ['cmd-2', { ok: false, error: 'refused' }],
     ])
     expect(inbox.lastSeen).toBeGreaterThan(0)
     await transport.close()

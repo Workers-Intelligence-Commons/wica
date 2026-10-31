@@ -1,5 +1,5 @@
-// Entrée du navigateur : avant l'hydratation, le compte est connu, le cache d'un compte déconnecté
-// ou d'un autre compte est vidé, et les fichiers du cache local que la page lit sont ouverts.
+// Browser entry point: before hydration, the account is known, the cache of a logged-out account
+// or of another account is cleared, and the local cache files the page reads are opened.
 
 import { StartClient } from '@tanstack/react-start/client'
 import { StrictMode } from 'react'

@@ -1,12 +1,12 @@
-// Déploiement sur Cloudflare Workers. Postgres et Electric tournent sur un hôte allumé en
-// permanence ; Hyperdrive y mène, et Electric est joint par son adresse publique (ELECTRIC_URL).
+// Deployment on Cloudflare Workers. Postgres and Electric run on a host that is always on;
+// Hyperdrive leads there, and Electric is reached through its public address (ELECTRIC_URL).
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "wica-chat",
   "compatibility_date": "2026-10-13",
   "compatibility_flags": ["nodejs_compat"],
   "main": "./src/server.ts",
-  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<identifiant Hyperdrive>" }],
+  "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<Hyperdrive identifier>" }],
   "queues": {
     "producers": [{ "binding": "WAKE_QUEUE", "queue": "wica-wakeups" }],
     "consumers": [{ "queue": "wica-wakeups", "max_batch_size": 1, "max_retries": 10 }],

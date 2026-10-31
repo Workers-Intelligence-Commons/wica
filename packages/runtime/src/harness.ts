@@ -1,5 +1,5 @@
-// Le serveur : la boucle qui interprète les
-// intentions, l'exécution des outils et les appels au modèle, avec les callbacks de l'hôte.
+// The server: the loop that interprets the intents, runs the tools and calls the model, with the
+// host callbacks.
 
 import {
   APPROVAL_TOOL,
@@ -41,21 +41,21 @@ import {
   runTurn,
 } from './turn.ts'
 
-/** Qui est ce client, et a-t-il le droit de lire et d'écrire cette conversation. */
+/** Who this client is, and whether it has the right to read and write this conversation. */
 export interface ClientAuth {
   authenticate(hello: { token?: string }): Promise<{ identity: unknown; from: Origin } | null>
   canAccess(identity: unknown, conversationId: string, mode: 'read' | 'write'): Promise<boolean>
 }
 
-/** Un seul processus, une seule personne : tout client est le propriétaire. */
+/** A single process, a single person: every client is the owner. */
 export const localAuth: ClientAuth = {
   authenticate: async () => ({ identity: 'local', from: { channel: 'local', trust: 'owner' } }),
   canAccess: async () => true,
 }
 
 /**
- * Serveur seul sur une machine : le client qui présente le jeton d'appairage est le
- * propriétaire. La comparaison prend un temps constant pour ne rien révéler du jeton.
+ * Server alone on a machine: the client that presents the pairing token is the owner. The
+ * comparison takes constant time so that it reveals nothing about the token.
  */
 export function pairingTokenAuth(token: string): ClientAuth {
   const expected = new TextEncoder().encode(token)
@@ -79,37 +79,37 @@ export type HarnessEvent =
   | { type: 'error'; message: string }
   | { type: 'done'; limited: boolean; waiting: number }
 
-/** Ce qui attend une personne : de quoi lui envoyer une notification (téléphone). */
+/** What waits for a person: what is needed to send them a notification (phone). */
 export type Attention =
   | { kind: 'approval' | 'question'; call: Question; to?: Destination }
-  /** Une tâche s'est terminée et rien n'attend plus. */
+  /** A task has finished and nothing waits anymore. */
   | { kind: 'done' }
 
 export type HarnessOptions = {
   model: ModelAdapter
   /**
-   * Outils, ou une fonction relue à chaque tour quand la liste change (MCP, modes) ; elle reçoit
-   * la conversation, dont une session d'éditeur peut fixer les outils.
+   * Tools, or a function read again at each turn when the list changes (MCP, modes); it receives
+   * the conversation, whose tools an editor session can set.
    */
   tools?: Tool[] | ((conversationId: string) => Tool[] | Promise<Tool[]>)
-  /** Skills fournis par l'hôte (voir `@wica/skills`) : leurs consignes et leurs outils. */
+  /** Skills provided by the host (see `@wica/skills`): their instructions and their tools. */
   skills?: { instructions: string; tools: Tool[] }
-  /** Absent : tout est autorisé, avec un avertissement unique. */
+  /** Absent: everything is allowed, with a one-time warning. */
   authorize?: Authorize
   store?: Store
   policy?: Policy
   limits?: Limits
   auth?: ClientAuth
   now?: () => string
-  /** Consignes pour le modèle, ajoutées à chaque requête sans entrer dans le journal. */
+  /** Instructions for the model, added to each request without entering the journal. */
   instructions?: string
   /**
-   * Rendu d'une réponse de la personne en parties du journal ; par défaut, le texte tel quel ou
-   * le JSON de la valeur. `renderAnswer` de `@wica/tools-user` rend les réponses d'`ask_user`.
+   * Rendering of an answer from the person into journal parts; by default, the text as it is or
+   * the JSON of the value. `renderAnswer` from `@wica/tools-user` renders the `ask_user` answers.
    */
   renderAnswer?: (call: Extract<Item, { kind: 'tool_call' }> | undefined, value: unknown) => Part[]
   onUserMessage?: (item: Extract<Item, { kind: 'assistant_text' }>) => void
-  /** Traces avant et après chaque outil exécuté. */
+  /** Traces before and after each tool that runs. */
   onToolStart?: (conversationId: string, call: ToolCall) => void
   onToolEnd?: (
     conversationId: string,
@@ -117,30 +117,30 @@ export type HarnessOptions = {
     result: { output: Part[]; isError: boolean },
   ) => void
   /**
-   * Réveille une conversation pour son tour suivant. Absent : un planificateur du processus.
-   * Fourni par l'hôte, il doit appeler `harness.wake(conversationId)` à chaque réveil.
+   * Wakes a conversation for its next turn. Absent: a process scheduler. When provided by the
+   * host, it must call `harness.wake(conversationId)` at each wake-up.
    */
   scheduler?: Scheduler
-  /** Sessions des clients. Absent : en mémoire du processus. */
+  /** Client sessions. Absent: in the process memory. */
   sessions?: SessionStore
-  /** Durée de vie d'une session, prolongée à chaque reprise. 24 h par défaut. */
+  /** Lifetime of a session, extended at each resume. 24 h by default. */
   sessionTtlMs?: number
-  /** Durée du bail d'un tour sur sa conversation. 30 s par défaut. */
+  /** Duration of a turn's lease on its conversation. 30 s by default. */
   leaseMs?: number
-  /** Budget de temps d'un tour avant de rendre la main et de demander une reprise. */
+  /** Time budget of a turn before handing back control and asking for a resume. */
   turnBudgetMs?: number
-  /** Éléments ajoutés entre deux instantanés de l'état. 100 par défaut. */
+  /** Items added between two state snapshots. 100 by default. */
   snapshotEvery?: number
-  /** Attente maximale d'une commande quand un autre processus tient la conversation. 30 s par défaut. */
+  /** Maximum wait of a command when another process holds the conversation. 30 s by default. */
   commandWaitMs?: number
   /**
-   * Approbateur désigné d'une conversation : ses demandes d'approbation lui sont adressées, et
-   * lui seul peut y répondre. Absent : tout client autorisé à écrire répond.
+   * Designated approver of a conversation: its approval requests are addressed to them, and only
+   * they can answer. Absent: every client allowed to write answers.
    */
   approver?: (conversationId: string) => Destination | undefined
-  /** Délai d'un outil confié à un client quand aucun client n'est attaché. Absent : il attend. */
+  /** Delay of a tool delegated to a client when no client is attached. Absent: it waits. */
   clientToolTimeoutMs?: number
-  /** Une approbation, une question ou une fin de tâche attend une personne. */
+  /** An approval, a question or the end of a task waits for a person. */
   onAttentionNeeded?: (conversationId: string, attention: Attention) => void
 }
 
@@ -166,7 +166,7 @@ export function createHarness(options: HarnessOptions) {
   const instructions =
     [options.instructions, options.skills?.instructions].filter(Boolean).join('\n\n') || undefined
 
-  /** Questions posées par un outil en cours, en attente de la personne. */
+  /** Questions asked by a running tool, waiting for the person. */
   const pendingAnswers = new Map<
     string,
     { resolve: (a: Answer) => void; reject: (e: Error) => void }
@@ -180,7 +180,7 @@ export function createHarness(options: HarnessOptions) {
           'abort',
           () => {
             pendingAnswers.delete(key)
-            reject(new Error('Question interrompue.'))
+            reject(new Error('Question interrupted.'))
           },
           { once: true },
         )
@@ -190,14 +190,12 @@ export function createHarness(options: HarnessOptions) {
     for (const [key, pending] of pendingAnswers) {
       if (!key.startsWith(`${conversationId}:`)) continue
       pendingAnswers.delete(key)
-      pending.reject(new Error('Interrompu par la personne.'))
+      pending.reject(new Error('Interrupted by the person.'))
     }
   }
   if (!options.authorize && !warnedAllowAll) {
     warnedAllowAll = true
-    console.warn(
-      'wica : aucune fonction authorize fournie, tous les outils sont autorisés (allowAll).',
-    )
+    console.warn('wica: no authorize function provided, every tool is allowed (allowAll).')
   }
   const auth = options.auth ?? localAuth
   const sessions = options.sessions ?? new MemorySessionStore()
@@ -208,7 +206,7 @@ export function createHarness(options: HarnessOptions) {
   const listeners = new Map<string, Set<(e: HarnessEvent) => void>>()
   const queues = new Map<string, Promise<unknown>>()
   const seen = new Map<string, Promise<void>>()
-  /** Conversations dont un tour tourne dans ce processus. */
+  /** Conversations with a turn running in this process. */
   const active = new Set<string>()
 
   const broadcast = (conversationId: string, frame: ServerFrame, event?: HarnessEvent) => {
@@ -216,7 +214,7 @@ export function createHarness(options: HarnessOptions) {
     if (event) listeners.get(conversationId)?.forEach((l) => l(event))
   }
 
-  /** Les tours d'une conversation s'exécutent l'un après l'autre dans ce processus. */
+  /** The turns of a conversation run one after the other in this process. */
   const enqueue = <T>(conversationId: string, job: () => Promise<T>): Promise<T> => {
     const previous = queues.get(conversationId) ?? Promise.resolve()
     const next = previous.then(job, job)
@@ -233,7 +231,7 @@ export function createHarness(options: HarnessOptions) {
   }
   const nowMs = () => Date.parse(options.now?.() ?? new Date().toISOString())
 
-  /** Un tour ; il ne lit ni n'écrit rien si un autre processus tient la conversation. */
+  /** A turn; it reads and writes nothing if another process holds the conversation. */
   const turn = (conversationId: string, events: EventBody[], maxIntents?: number) =>
     enqueue(conversationId, async () => {
       const salt = (await store.load(conversationId, Number.MAX_SAFE_INTEGER)).salt
@@ -304,9 +302,9 @@ export function createHarness(options: HarnessOptions) {
   }
 
   /**
-   * Un réveil : un tour, puis une reprise planifiée s'il reste du travail. Un tour pris par un
-   * autre processus est réessayé à l'échéance de son bail ; un tour périmé s'arrête sans bruit,
-   * car celui qui l'a remplacé poursuit.
+   * A wake-up: a turn, then a scheduled resume if work remains. A turn taken by another process
+   * is retried when its lease expires; a stale turn stops silently, because the one that replaced
+   * it carries on.
    */
   const wake = async (conversationId: string): Promise<void> => {
     status(conversationId, true)
@@ -319,7 +317,7 @@ export function createHarness(options: HarnessOptions) {
       }
       status(conversationId, false)
       if (error instanceof StaleEpochError) return
-      // Une panne de l'hôte (Store, transport) pendant un tour : les clients et `run` l'apprennent.
+      // A host failure (Store, transport) during a turn: the clients and `run` learn about it.
       fail(conversationId, error)
       listeners.get(conversationId)?.forEach((l) => l({ type: 'done', limited: false, waiting: 0 }))
       return
@@ -360,7 +358,7 @@ export function createHarness(options: HarnessOptions) {
     }
   }
 
-  /** Le tour court d'une commande ; il attend qu'un autre processus libère la conversation. */
+  /** The short turn of a command; it waits for another process to release the conversation. */
   const write = async (conversationId: string, events: EventBody[]) => {
     const deadline = Date.now() + (options.commandWaitMs ?? 30_000)
     for (;;) {
@@ -395,7 +393,7 @@ export function createHarness(options: HarnessOptions) {
       case 'answer': {
         const prefix = approvalCallId('')
         if (command.callId.startsWith(prefix)) {
-          // Une demande adressée à l'approbateur désigné n'accepte que sa réponse.
+          // A request addressed to the designated approver accepts only their answer.
           const { items } = await store.load(conversationId, 0)
           const request = items.find((i) => i.kind === 'tool_call' && i.callId === command.callId)
           const to = request?.kind === 'tool_call' ? request.to : undefined
@@ -404,7 +402,7 @@ export function createHarness(options: HarnessOptions) {
             (from.channel !== to.channel ||
               (to.recipient !== undefined && from.author !== to.recipient))
           ) {
-            throw new Error('seul l’approbateur désigné peut répondre à cette approbation')
+            throw new Error('only the designated approver can answer this approval')
           }
           const value = command.value as boolean | { granted?: boolean }
           const granted = value === true || (typeof value === 'object' && value?.granted === true)
@@ -413,10 +411,10 @@ export function createHarness(options: HarnessOptions) {
         const { items } = await store.load(conversationId, 0)
         const call = items.find((i) => i.kind === 'tool_call' && i.callId === command.callId)
         if (call?.kind === 'tool_call' && call.channel === 'environment') {
-          // Résultat d'un outil exécuté par le client : il reste un résultat d'outil.
+          // Result of a tool run by the client: it stays a tool result.
           const result = command.value as Partial<ClientToolResult> | null
           if (!result || !Array.isArray(result.output)) {
-            throw new Error('résultat d’outil attendu : { output, isError? }')
+            throw new Error('tool result expected: { output, isError? }')
           }
           return [
             {
@@ -441,15 +439,15 @@ export function createHarness(options: HarnessOptions) {
   }
 
   /**
-   * Traite une commande : un tour court l'écrit et l'accuse, puis la suite part sans que la
-   * requête attende le modèle. Une commande rejouée avec le même identifiant n'agit qu'une fois.
+   * Processes a command: a short turn writes and acknowledges it, then the rest leaves without the
+   * request waiting for the model. A command replayed with the same identifier acts only once.
    */
   const handle = (conversationId: string, commandId: string, command: Command, from: Origin) => {
     const key = `${conversationId}:${commandId}`
     const existing = seen.get(key)
     if (existing) return existing
     const accepted = (async () => {
-      // Réponse à une question d'un outil en cours : elle va droit à l'outil, qui tient le tour.
+      // Answer to a question of a running tool: it goes straight to the tool, which holds the turn.
       const pending =
         command.t === 'answer'
           ? pendingAnswers.get(`${conversationId}:${command.callId}`)
@@ -475,13 +473,12 @@ export function createHarness(options: HarnessOptions) {
   return {
     store,
 
-    /** Point d'entrée du planificateur de l'hôte : le tour suivant de la conversation. */
+    /** Entry point of the host scheduler: the next turn of the conversation. */
     wake,
 
     /**
-     * Événement externe (minuteur, webhook, changement de fichier) : il entre dans le journal
-     * avec sa confiance, puis la conversation se réveille. Une livraison répétée du même
-     * événement ne forme qu'un élément.
+     * External event (timer, webhook, file change): it enters the journal with its trust, then
+     * the conversation wakes up. A repeated delivery of the same event forms only one item.
      */
     async external(
       conversationId: string,
@@ -491,7 +488,7 @@ export function createHarness(options: HarnessOptions) {
       await scheduler.wake(conversationId)
     },
 
-    /** Sert le protocole client sur un transport, jusqu'à sa fermeture. */
+    /** Serves the client protocol on a transport, until it closes. */
     async serve(transport: ServerTransport): Promise<void> {
       let identity: Session | null = null
       const subscriptions = new Map<string, Sink>()
@@ -503,7 +500,7 @@ export function createHarness(options: HarnessOptions) {
             continue
           }
           if (frame.kind === 'hello') {
-            // Une session encore valide évite de renégocier ; perdue, elle coûte une authentification.
+            // A session still valid avoids negotiating again; lost, it costs an authentication.
             const known = frame.sessionId ? await sessions.get(frame.sessionId) : undefined
             const resumed = known !== undefined && known.expiresAt > Date.now()
             let session: Session | null = resumed ? known : null
@@ -515,7 +512,7 @@ export function createHarness(options: HarnessOptions) {
             }
             identity = session && { ...session, expiresAt: Date.now() + sessionTtlMs }
             if (!identity) {
-              send({ kind: 'error', message: 'authentification refusée' })
+              send({ kind: 'error', message: 'authentication refused' })
               continue
             }
             await sessions.put(identity)
@@ -523,12 +520,12 @@ export function createHarness(options: HarnessOptions) {
             continue
           }
           if (!identity) {
-            send({ kind: 'error', message: 'hello attendu' })
+            send({ kind: 'error', message: 'hello expected' })
             continue
           }
           if (frame.kind === 'subscribe') {
             if (!(await auth.canAccess(identity.identity, frame.conversationId, 'read'))) {
-              send({ kind: 'error', message: 'accès refusé' })
+              send({ kind: 'error', message: 'access denied' })
               continue
             }
             const loaded = await store.load(frame.conversationId, frame.fromSeq)
@@ -559,14 +556,14 @@ export function createHarness(options: HarnessOptions) {
           }
           const envelope: Envelope = frame
           if (!(await auth.canAccess(identity.identity, envelope.conversationId, 'write'))) {
-            send({ kind: 'ack', commandId: envelope.commandId, ok: false, error: 'accès refusé' })
+            send({ kind: 'ack', commandId: envelope.commandId, ok: false, error: 'access denied' })
             continue
           }
           const session = identity
           const ack = () => send({ kind: 'ack', commandId: envelope.commandId, ok: true })
-          // Commande déjà traitée dans cette session (accusé perdu) : elle n'agit pas deux fois.
-          // Le `clientSeq` est propre à chaque client ; par une boîte de commandes, plusieurs
-          // clients partagent une connexion, d'où la clé de la session du client dans celle-ci.
+          // Command already processed in this session (lost acknowledgement): it does not act twice.
+          // The `clientSeq` belongs to each client; through a command inbox, several clients share
+          // a connection, hence the key of the client session inside this one.
           const key = `${session.id}:${envelope.sessionId}`
           const last = await sessions.lastCommand(key, envelope.conversationId)
           if (last !== undefined && envelope.clientSeq <= last) {
@@ -582,7 +579,7 @@ export function createHarness(options: HarnessOptions) {
       } finally {
         for (const [conversationId, sink] of subscriptions) {
           sinks.get(conversationId)?.delete(sink)
-          // Plus aucun client attaché : l'échéance des outils confiés à un client commence.
+          // No client attached anymore: the deadline of the tools delegated to a client starts.
           if (options.clientToolTimeoutMs !== undefined && !sinks.get(conversationId)?.size) {
             void scheduler.wake(conversationId).catch(() => {})
           }
@@ -590,7 +587,7 @@ export function createHarness(options: HarnessOptions) {
       }
     },
 
-    /** Un flux d'événements en une ligne : envoie le message et suit la conversation. */
+    /** An event stream in one line: sends the message and follows the conversation. */
     async *run(
       prompt: string | Part[],
       o: { conversationId?: string; from?: Origin } = {},
@@ -619,7 +616,7 @@ export function createHarness(options: HarnessOptions) {
           while (queue.length === 0) await new Promise<void>((r) => (wake = r))
           const event = queue.shift() as HarnessEvent
           yield event
-          // Une question en attente laisse le flux ouvert : la réponse arrive par `answer`.
+          // A pending question leaves the stream open: the answer arrives through `answer`.
           if (event.type === 'done' && event.waiting === 0) return
         }
       } finally {
@@ -627,7 +624,7 @@ export function createHarness(options: HarnessOptions) {
       }
     },
 
-    /** Répond à une question ou à une approbation, puis la conversation reprend. */
+    /** Answers a question or an approval, then the conversation resumes. */
     answer(conversationId: string, callId: string, value: unknown, from?: Origin) {
       return handle(
         conversationId,

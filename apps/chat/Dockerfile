@@ -1,6 +1,6 @@
-# Image de l'application du chat pour le Compose. Le contexte de construction est la racine du
-# dépôt, sous-modules compris : le chat dépend des paquets de l'espace de travail et du design
-# system dans `vendor/wic-design-system`, compilé par le `postinstall` de la racine.
+# Image of the chat application for Compose. The build context is the repository root,
+# submodules included: the chat depends on the workspace packages and on the design system in
+# `vendor/wic-design-system`, compiled by the root `postinstall`.
 
 FROM oven/bun:1.4.4 AS build
 WORKDIR /app

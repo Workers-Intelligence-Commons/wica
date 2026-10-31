@@ -12,7 +12,7 @@ import {
   trustedProxyAuth,
 } from '../src/server/identity.ts'
 
-/** Dépôt d'identités en mémoire : comptes reliés par (fournisseur, sujet), appartenances suivies. */
+/** In-memory identity repository: accounts linked by (provider, subject), memberships tracked. */
 class MemoryRepo implements IdentityRepo {
   readonly links = new Map<string, string>()
   readonly memberships = new Map<string, string[]>()
@@ -63,7 +63,7 @@ const token = (
 const bearer = (value: string) =>
   new Request('https://chat.test/', { headers: { authorization: `Bearer ${value}` } })
 
-describe('adaptateur OIDC', () => {
+describe('OIDC adapter', () => {
   const setup = () => {
     const repo = new MemoryRepo()
     return {
@@ -72,7 +72,7 @@ describe('adaptateur OIDC', () => {
     }
   }
 
-  it('relie un jeton valide au même compte interne à chaque connexion', async () => {
+  it('links a valid token to the same internal account at each login', async () => {
     const { auth } = setup()
     const first = await auth.authenticate(bearer(await token({ orgs: ['lab'] })))
     const second = await auth.authenticate(bearer(await token({ orgs: ['lab'] })))
@@ -80,8 +80,8 @@ describe('adaptateur OIDC', () => {
     expect(second?.id).toBe('u1')
   })
 
-  // Les appartenances suivent les claims : une organisation qui disparaît retire l'accès.
-  it('retire l’appartenance d’une organisation absente des claims', async () => {
+  // Memberships follow the claims: an organization that disappears removes the access.
+  it('removes the membership of an organization absent from the claims', async () => {
     const { auth } = setup()
     await auth.authenticate(bearer(await token({ orgs: ['lab', 'ops'] })))
     expect((await auth.authenticate(bearer(await token({ orgs: ['lab'] }))))?.orgs).toEqual([
@@ -89,17 +89,17 @@ describe('adaptateur OIDC', () => {
     ])
   })
 
-  it('refuse un jeton échu, d’un autre émetteur ou pour une autre audience', async () => {
+  it('refuses an expired token, one from another issuer, or one for another audience', async () => {
     const { auth } = setup()
     const past = Math.floor(Date.now() / 1000) - 3600
     expect(await auth.authenticate(bearer(await token({}, { exp: past })))).toBeNull()
     expect(
       await auth.authenticate(bearer(await token({}, { iss: 'https://evil.test' }))),
     ).toBeNull()
-    expect(await auth.authenticate(bearer(await token({}, { aud: 'autre' })))).toBeNull()
+    expect(await auth.authenticate(bearer(await token({}, { aud: 'other' })))).toBeNull()
   })
 
-  it('refuse un jeton non signé (alg none)', async () => {
+  it('refuses an unsigned token (alg none)', async () => {
     const { auth } = setup()
     const part = (v: unknown) => Buffer.from(JSON.stringify(v)).toString('base64url')
     const now = Math.floor(Date.now() / 1000)
@@ -108,7 +108,7 @@ describe('adaptateur OIDC', () => {
   })
 })
 
-describe('proxy de confiance', () => {
+describe('trusted proxy', () => {
   const make = () => {
     const repo = new MemoryRepo()
     const auth = trustedProxyAuth(repo, {
@@ -124,26 +124,26 @@ describe('proxy de confiance', () => {
       headers: { 'remote-user': 'alice', 'remote-groups': 'lab', 'x-test-address': address },
     })
 
-  it('lit l’identité sur une connexion du proxy', async () => {
+  it('reads the identity on a connection from the proxy', async () => {
     expect(await make().authenticate(request('10.0.0.2'))).toMatchObject({
       id: 'u1',
       orgs: [{ id: 'lab' }],
     })
   })
 
-  // Sinon n'importe qui pourrait se faire passer pour une autre personne en posant l'en-tête.
-  it('ignore l’en-tête d’identité venu d’une autre adresse', async () => {
+  // Otherwise anyone could pass as another person by setting the header.
+  it('ignores the identity header coming from another address', async () => {
     expect(await make().authenticate(request('203.0.113.9'))).toBeNull()
   })
 })
 
-describe('session et clés de l’application', () => {
+describe('application session and keys', () => {
   const secret = 's'.repeat(32)
   const cookieRequest = (cookie: string) =>
     new Request('https://chat.test/', { headers: { cookie } })
   const cookieOf = (header: string) => header.split(';')[0] as string
 
-  it('reconnaît une session signée jusqu’à son échéance seulement', async () => {
+  it('recognizes a signed session only until it expires', async () => {
     const repo = new MemoryRepo()
     const header = await sessionCookie(secret, 'u7', 0)
     const at = (now: number) => appAuth({ repo, sessionSecret: secret, now: () => now })
@@ -151,10 +151,10 @@ describe('session et clés de l’application', () => {
     expect(await at(13 * 3600 * 1000).authenticate(cookieRequest(cookieOf(header)))).toBeNull()
   })
 
-  it('refuse un cookie de session modifié', async () => {
+  it('refuses a modified session cookie', async () => {
     const repo = new MemoryRepo()
     const header = cookieOf(await sessionCookie(secret, 'u7'))
-    // Un caractère du milieu de la signature porte 6 bits ; le dernier peut ne porter que du remplissage.
+    // A middle character of the signature carries 6 bits; the last one may carry only padding.
     const at = header.lastIndexOf('.') + 10
     const forged = header.slice(0, at) + (header[at] === 'A' ? 'B' : 'A') + header.slice(at + 1)
     expect(
@@ -162,9 +162,9 @@ describe('session et clés de l’application', () => {
     ).toBeNull()
   })
 
-  it('ne reconnaît plus une clé d’API révoquée', async () => {
+  it('no longer recognizes a revoked API key', async () => {
     const repo = new MemoryRepo()
-    const key = 'wica_cle-de-test'
+    const key = 'wica_test-key'
     repo.keys.set(await hashKey(key), { id: 'u3', kind: 'apiKey', orgs: [], scopes: [] })
     const auth = appAuth({ repo, sessionSecret: secret })
     expect((await auth.authenticate(bearer(key)))?.id).toBe('u3')

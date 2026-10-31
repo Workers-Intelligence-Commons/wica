@@ -1,6 +1,6 @@
-// Faux modèles pour essayer une application sans vrai modèle ni serveur de modèle : du lorem
-// ipsum écrit à l'avance, envoyé mot par mot comme un flux. Ce module n'importe rien d'autre que
-// le cœur, pour qu'une application puisse l'embarquer sans le reste du paquet de test.
+// Fake models for trying an application without a real model or model server: lorem ipsum
+// written in advance, sent word by word as a stream. This module imports nothing but the core,
+// so that an application can embed it without the rest of the test package.
 
 import {
   type AssistantMessage,
@@ -14,8 +14,8 @@ import {
 import type { ModelAdapter, ModelChunk } from '@wica/runtime'
 
 /**
- * `lorem` répond en texte. `lorem-tools` appelle à chaque tour un outil de la requête, à tour de
- * rôle, puis répond en texte une fois son résultat reçu.
+ * `lorem` answers with text. `lorem-tools` calls one tool of the request at each turn, in turn,
+ * then answers with text once its result is received.
  */
 export const LOREM_MODELS = ['lorem', 'lorem-tools'] as const
 export type LoremModel = (typeof LOREM_MODELS)[number]
@@ -33,8 +33,8 @@ const PARAGRAPHS = [
 const SENTENCE = 'Lorem ipsum dolor sit amet.'
 
 /**
- * Outils que `lorem-tools` n'appelle jamais : une question ou une demande attendrait la
- * personne, et un réveil relancerait le modèle sans elle.
+ * Tools that `lorem-tools` never calls: a question or a request would wait for the person, and a
+ * wake-up would restart the model without them.
  */
 const SKIPPED = new Set(['ask_user', ELICIT_TOOL, SCHEDULE_TOOL, CANCEL_WAKEUP_TOOL])
 
@@ -79,7 +79,7 @@ function respond(kind: LoremModel, request: ModelRequest): AssistantMessage {
   }
 }
 
-/** Entrée qui satisfait les champs requis du schéma de l'outil, remplie de lorem. */
+/** Input that satisfies the required fields of the tool schema, filled with lorem. */
 function input(tool: ToolSpec): Record<string, unknown> {
   const schema = tool.inputSchema as {
     properties?: Record<string, JSONSchema>

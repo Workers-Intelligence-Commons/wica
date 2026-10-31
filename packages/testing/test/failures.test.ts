@@ -3,12 +3,12 @@ import { describe, expect, it } from 'vite-plus/test'
 
 import { scriptedModel } from '../src/index.ts'
 
-describe('pannes de l’hôte', () => {
-  // Sans ce rapport, `run` attendrait sans fin une fin de tour qui n'arrive jamais.
-  it('une panne du Store pendant un outil termine run avec l’erreur', async () => {
+describe('host failures', () => {
+  // Without this report, `run` would wait forever for the end of a turn that never comes.
+  it('a Store failure during a tool ends run with the error', async () => {
     class BrokenStore extends MemoryStore {
       override async claimToolCall(): Promise<'claimed'> {
-        throw new Error('panne du store pendant un outil')
+        throw new Error('store failure during a tool')
       }
     }
     const harness = createHarness({
@@ -16,7 +16,7 @@ describe('pannes de l’hôte', () => {
       authorize: () => 'allow',
       tools: [
         {
-          spec: { name: 't', description: 'outil', inputSchema: {}, channel: 'environment' },
+          spec: { name: 't', description: 'tool', inputSchema: {}, channel: 'environment' },
           run: async () => [],
         },
       ],
@@ -28,7 +28,7 @@ describe('pannes de l’hôte', () => {
     for await (const event of harness.run('x', { conversationId: 'c' })) {
       events.push(event.type === 'error' ? `error:${event.message}` : event.type)
     }
-    expect(events).toContain('error:panne du store pendant un outil')
+    expect(events).toContain('error:store failure during a tool')
     expect(events.at(-1)).toBe('done')
   })
 })

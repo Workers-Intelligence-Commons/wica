@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vite-plus/test'
 
 import { conversationStore } from '../src/index.ts'
 
-/** Faux client : une vue neuve à chaque appel, comme le vrai, et des changements à la demande. */
+/** Fake client: a fresh view at each call, like the real one, and changes on demand. */
 function fakeClient() {
   let head = 'a'
   const listeners = new Set<() => void>()
@@ -28,8 +28,8 @@ function fakeClient() {
 }
 
 describe('conversationStore', () => {
-  // useSyncExternalStore boucle sans fin si la valeur change à chaque lecture sans changement.
-  it('rend la même vue entre deux changements, et la nouvelle après un changement', () => {
+  // useSyncExternalStore loops forever if the value changes at each read without a change.
+  it('returns the same view between two changes, and the new one after a change', () => {
     const { client, change } = fakeClient()
     const store = conversationStore(client, 'c1')
     let notified = 0
@@ -44,7 +44,7 @@ describe('conversationStore', () => {
     off()
   })
 
-  it('ne garde rien de périmé quand personne n’écoute', () => {
+  it('keeps nothing stale when no one listens', () => {
     const { client, change } = fakeClient()
     const store = conversationStore(client, 'c1')
     const off = store.subscribe(() => {})

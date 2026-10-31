@@ -1,4 +1,4 @@
-// Routeur de l'application : un `DbClient` par requête serveur et un pour le navigateur.
+// Application router: one `DbClient` per server request and one for the browser.
 
 import { DbClient } from '@tanstack/react-db'
 import { createRouter } from '@tanstack/react-router'

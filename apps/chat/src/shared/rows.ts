@@ -1,6 +1,6 @@
-// Correspondance entre un élément du journal et sa ligne dans `items`, commune au serveur et au
-// navigateur. `payload` porte l'élément ; `seq`, `status` et `parent_id` ont leurs colonnes, qui
-// font foi.
+// Mapping between a journal item and its row in `items`, shared by the server and the browser.
+// `payload` carries the item; `seq`, `status` and `parent_id` have their own columns, which are
+// the source of truth.
 
 import { canonicalJson, type Item, type ItemDraft, type Part, sha256 } from '@wica/core'
 
@@ -27,15 +27,15 @@ export const rowToItem = (row: Pick<ItemRow, 'id' | 'parent_id' | 'seq' | 'statu
   }) as Item
 
 /**
- * Au-delà de ce poids, un résultat d'outil part dans `blobs` : la synchro ne transporte que son
- * aperçu, et le modèle relit le contenu complet par le `Store`.
+ * Beyond this size, a tool result goes into `blobs`: the sync carries only its preview, and the
+ * model reads the full content again through the `Store`.
  */
 export const BLOB_THRESHOLD = 64 * 1024
 const PREVIEW_CHARS = 2_000
 
 const hex = (bytes: Uint8Array) => [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('')
 
-/** Ligne à écrire pour un élément, et le contenu complet à mettre de côté s'il est trop gros. */
+/** Row to write for an item, and the full content to set aside if it is too large. */
 export function draftToRow(draft: ItemDraft): {
   payload: Record<string, unknown>
   blob: { sha256: string; output: Part[] } | null
@@ -49,7 +49,7 @@ export function draftToRow(draft: ItemDraft): {
   const preview: Part[] = [
     {
       type: 'text',
-      text: `${text.slice(0, PREVIEW_CHARS)}\n[aperçu : ${json.length} octets au total]`,
+      text: `${text.slice(0, PREVIEW_CHARS)}\n[preview: ${json.length} bytes in total]`,
     },
   ]
   return {
@@ -58,6 +58,6 @@ export function draftToRow(draft: ItemDraft): {
   }
 }
 
-/** Élément complet : un aperçu reprend le contenu mis de côté. */
+/** Full item: a preview takes back the content that was set aside. */
 export const restoreItem = (item: Item, blob: Part[] | undefined): Item =>
   blob && item.kind === 'tool_result' ? { ...item, output: blob } : item

@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vite-plus/test'
 
 import { proxiedResponse, shapeSpec, upstreamUrl } from '../src/server/shapes.ts'
 
-describe('proxy des shapes', () => {
-  // Le client ne doit jamais choisir ce qu'il lit : la shape vient du serveur, pour le compte de la requête.
-  it('ignore la table, le filtre et les colonnes du client et ajoute le secret', () => {
+describe('shape proxy', () => {
+  // The client must never choose what it reads: the shape comes from the server, for the account of the request.
+  it('ignores the table, filter and columns of the client and adds the secret', () => {
     const spec = shapeSpec('items', { owner: 'u1', conversationId: 'c1' })
-    if (!spec) throw new Error('shape attendue')
+    if (!spec) throw new Error('shape expected')
     const client = new URL(
       'https://chat.test/api/shapes/items?offset=5_2&handle=h1&live=true&table=users&where=true&columns=*&params[1]=c2&secret=x&subset__where=1',
     )
@@ -24,17 +24,17 @@ describe('proxy des shapes', () => {
     })
   })
 
-  it('ne sert pas de shape de conversation sans conversation vérifiée', () => {
+  it('serves no conversation shape without a verified conversation', () => {
     expect(shapeSpec('items', { owner: 'u1' })).toBeNull()
     expect(shapeSpec('commands', { owner: 'u1' })).toBeNull()
   })
 
-  it('ne transmet jamais le hachage du jeton d’un serveur', () => {
+  it('never forwards the hash of a server token', () => {
     expect(shapeSpec('servers', { owner: 'u1' })?.columns).not.toContain('token_hash')
   })
 
-  // Un cache partagé ne doit pas resservir la shape d'une personne à une autre.
-  it('rend la réponse d’Electric avec Vary et sans en-têtes de compression', async () => {
+  // A shared cache must not serve one person's shape to another again.
+  it('returns the Electric response with Vary and without compression headers', async () => {
     const upstream = new Response('[]', {
       status: 200,
       headers: { 'content-encoding': 'gzip', 'content-length': '2', 'electric-handle': 'h1' },

@@ -1,4 +1,4 @@
-// Déclaration minimale du module de Workers utilisé par `workers.ts`.
+// Minimal declaration of the Workers module used by `workers.ts`.
 declare module 'cloudflare:workers' {
   export const env: Record<string, unknown>
   export function waitUntil(promise: Promise<unknown>): void

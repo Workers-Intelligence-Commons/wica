@@ -1,6 +1,6 @@
-// Interfaces d'hébergement du Harness sur Postgres : sessions des clients, réveils des
-// conversations (table de reprise dans le Compose, Cloudflare Queues sur Workers) et jetons de
-// modèle des personnes, chiffrés par la clé de l'instance.
+// Harness hosting interfaces on Postgres: client sessions, conversation wake-ups (resume table in
+// Compose, Cloudflare Queues on Workers), and people's model tokens, encrypted by the instance
+// key.
 
 import type {
   Credential as PiCredential,
@@ -48,7 +48,7 @@ export class PgSessionStore implements SessionStore {
   }
 
   async recordCommand(key: string, conversationId: string, clientSeq: number) {
-    // La clé commence par l'identifiant de la session du serveur (voir `SessionStore`).
+    // The key starts with the identifier of the server session (see `SessionStore`).
     const sessionId = key.split(':')[0] ?? key
     await this.#sql`
       INSERT INTO session_commands (session_id, key, conversation_id, client_seq)
@@ -59,15 +59,15 @@ export class PgSessionStore implements SessionStore {
 }
 
 /**
- * Planificateur du Compose : un réveil est une ligne de `wakeups`, que le processus de
- * l'application réclame pendant son tour, par une réclamation courte prolongée tant que le tour
- * tourne. Une ligne n'est effacée qu'après son tour : un arrêt du processus en plein tour la
- * laisse en place, et elle redevient échue dès la fin de sa réclamation.
+ * Compose scheduler: a wake-up is a row of `wakeups`, which the application process claims for
+ * its turn, with a short claim extended as long as the turn runs. A row is deleted only after its
+ * turn: a process stop in the middle of a turn leaves it in place, and it becomes due again as
+ * soon as its claim ends.
  */
 export function pgScheduler(sql: postgres.Sql) {
   const scheduler: Scheduler = {
     async wake(conversationId, options = {}) {
-      // Pendant qu'un tour tient la ligne, le réveil demandé attend dans `rearm_at`.
+      // While a turn holds the row, the requested wake-up waits in `rearm_at`.
       await sql`
         INSERT INTO wakeups (conversation_id, due_at)
         VALUES (${conversationId}, now() + ${options.afterMs ?? 0} * interval '1 millisecond')
@@ -80,7 +80,7 @@ export function pgScheduler(sql: postgres.Sql) {
     },
   }
 
-  /** Réclame jusqu'à `limit` réveils échus, pour `claimMs` au plus. */
+  /** Claims up to `limit` due wake-ups, for at most `claimMs`. */
   async function due(limit: number, claimMs: number) {
     return sql<{ conversation_id: string }[]>`
       UPDATE wakeups SET claimed_until = now() + ${claimMs} * interval '1 millisecond'
@@ -97,7 +97,7 @@ export function pgScheduler(sql: postgres.Sql) {
       WHERE conversation_id = ${conversationId}`
   }
 
-  /** Fin d'un tour : la ligne disparaît, ou devient le réveil demandé pendant le tour. */
+  /** End of a turn: the row disappears, or becomes the wake-up requested during the turn. */
   async function done(conversationId: string) {
     await sql.begin(async (tx) => {
       await tx`
@@ -109,8 +109,8 @@ export function pgScheduler(sql: postgres.Sql) {
   }
 
   /**
-   * Boucle du processus : chaque réveil échu appelle `handler`, plusieurs conversations à la fois.
-   * Rend une fonction d'arrêt.
+   * Process loop: each due wake-up calls `handler`, several conversations at a time. Returns a
+   * stop function.
    */
   function run(
     handler: (conversationId: string) => Promise<void>,
@@ -148,12 +148,12 @@ export function pgScheduler(sql: postgres.Sql) {
   return { ...scheduler, run }
 }
 
-/** File Cloudflare : le message porte la conversation, son délai est celui du réveil. */
+/** Cloudflare queue: the message carries the conversation, its delay is the wake-up's. */
 export type WakeQueue = {
   send(body: { conversationId: string }, options?: { delaySeconds?: number }): Promise<void>
 }
 
-/** Délai maximal d'un message de Cloudflare Queues ; un réveil plus lointain est relayé. */
+/** Maximum delay of a Cloudflare Queues message; a later wake-up is relayed. */
 export const MAX_QUEUE_DELAY_SECONDS = 24 * 60 * 60
 
 export function queueScheduler(queue: WakeQueue): Scheduler {
@@ -169,9 +169,9 @@ export function queueScheduler(queue: WakeQueue): Scheduler {
 }
 
 /**
- * Jetons de modèle d'une personne pour pi-ai, une ligne par fournisseur. `modify` verrouille la
- * ligne (`SELECT ... FOR UPDATE`), si bien que deux tours ne rafraîchissent pas le même jeton.
- * Le premier usage d'un abonnement est noté par `warned_at`.
+ * A person's model tokens for pi-ai, one row per provider. `modify` locks the row
+ * (`SELECT ... FOR UPDATE`), so two turns do not refresh the same token. The first use of a
+ * subscription is recorded by `warned_at`.
  */
 export class PgModelCredentials implements PiCredentialStore {
   readonly #sql: postgres.Sql
@@ -239,7 +239,7 @@ export class PgModelCredentials implements PiCredentialStore {
       WHERE user_id = ${this.#userId} AND provider = ${provider} AND revoked_at IS NULL`
   }
 
-  /** Vrai la première fois seulement : l'avertissement d'abonnement n'est donné qu'une fois. */
+  /** True the first time only: the subscription warning is given only once. */
   async markWarned(provider: string): Promise<boolean> {
     const updated = await this.#sql`
       UPDATE model_credentials SET warned_at = now()

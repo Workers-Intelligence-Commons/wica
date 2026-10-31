@@ -1,7 +1,7 @@
-// Suites de conformité : ce que tout
-// `Store`, tout transport et tout adaptateur de modèle doit tenir. Chaque suite reçoit une
-// fabrique qui donne une instance neuve : les implémentations du dépôt les lancent dans les tests
-// de ce paquet, une application les lance dans les siens pour ses propres implémentations.
+// Conformance suites: what every `Store`, every transport and every model adapter must hold. Each
+// suite receives a factory that gives a fresh instance: the repository implementations run them
+// in the tests of this package, an application runs them in its own tests for its own
+// implementations.
 
 import type { ItemDraft } from '@wica/core'
 import type { ClientFrame, ClientTransport, ServerFrame, ServerTransport } from '@wica/protocol'
@@ -19,23 +19,23 @@ const message = (id: string, text: string, parentId: string | null = null): Item
 
 const claimed = async (store: Store, conversationId: string, leaseMs = 60_000) => {
   const claim = await store.claim(conversationId, leaseMs)
-  if (!('epoch' in claim)) throw new Error('conversation tenue')
+  if (!('epoch' in claim)) throw new Error('conversation held')
   return claim.epoch
 }
 
-/** Une écriture avec un `epoch` périmé échoue en `StaleEpochError`. */
+/** A write with a stale `epoch` fails with `StaleEpochError`. */
 const stale = (promise: Promise<unknown>) =>
   expect(promise).rejects.toMatchObject({ name: 'StaleEpochError' })
 
 export function storeConformance(name: string, make: () => Store | Promise<Store>) {
-  describe(`conformité du Store : ${name}`, () => {
-    it('attribue des seq croissants, relit depuis un seq et accuse un doublon sans le dupliquer', async () => {
+  describe(`Store conformance: ${name}`, () => {
+    it('assigns increasing seq values, reads again from a seq and acknowledges a duplicate without duplicating it', async () => {
       const store = await make()
       const epoch = await claimed(store, 'c')
-      const first = await store.append('c', [message('a', 'un'), message('b', 'deux', 'a')], epoch)
+      const first = await store.append('c', [message('a', 'one'), message('b', 'two', 'a')], epoch)
       const [a, b] = first.persisted
       expect(a && b && a.seq < b.seq).toBe(true)
-      const again = await store.append('c', [message('b', 'deux', 'a')], epoch)
+      const again = await store.append('c', [message('b', 'two', 'a')], epoch)
       expect(again.persisted).toEqual([b])
       const all = await store.load('c', 0)
       expect(all.items.map((i) => i.id)).toEqual(['a', 'b'])
@@ -44,7 +44,7 @@ export function storeConformance(name: string, make: () => Store | Promise<Store
       expect((await store.load('c', 0)).salt).toBe(all.salt)
     })
 
-    it('refuse une seconde réclamation pendant un bail, et rend l’écriture d’un epoch périmé impossible', async () => {
+    it('refuses a second claim during a lease, and makes the write of a stale epoch impossible', async () => {
       const store = await make()
       const first = await claimed(store, 'c')
       const busy = await store.claim('c', 60_000)
@@ -52,13 +52,13 @@ export function storeConformance(name: string, make: () => Store | Promise<Store
       await store.release('c', first)
       const second = await claimed(store, 'c')
       expect(second).toBeGreaterThan(first)
-      await stale(store.append('c', [message('a', 'un')], first))
+      await stale(store.append('c', [message('a', 'one')], first))
       await stale(store.renew('c', first))
       await stale(store.setHead('c', 'a', first))
       expect((await store.load('c', 0)).items).toEqual([])
     })
 
-    it('réclame un outil une fois par epoch : rejouée par le même tour, refusée par un autre', async () => {
+    it('claims a tool once per epoch: replayed by the same turn, refused by another', async () => {
       const store = await make()
       const first = await claimed(store, 'c')
       expect(await store.claimToolCall('c', 'k1', first)).toBe('claimed')
@@ -69,10 +69,10 @@ export function storeConformance(name: string, make: () => Store | Promise<Store
       expect(await store.claimToolCall('c', 'k2', second)).toBe('claimed')
     })
 
-    it('règle un élément en flux sans changer son seq, et déplace la tête', async () => {
+    it('settles a streaming item without changing its seq, and moves the head', async () => {
       const store = await make()
       const epoch = await claimed(store, 'c')
-      await store.append('c', [message('u', 'Bonjour')], epoch)
+      await store.append('c', [message('u', 'Hello')], epoch)
       const streaming: ItemDraft = {
         id: 't',
         parentId: 'u',
@@ -83,27 +83,27 @@ export function storeConformance(name: string, make: () => Store | Promise<Store
         audience: 'user',
       }
       const [{ seq } = { seq: 0 }] = (await store.append('c', [streaming], epoch)).persisted
-      await store.appendBatch('c', 't', 0, 'Sal', epoch)
-      await store.appendBatch('c', 't', 1, 'ut', epoch)
-      await store.settle('c', { ...streaming, status: 'done', text: 'Salut' }, epoch)
+      await store.appendBatch('c', 't', 0, 'H', epoch)
+      await store.appendBatch('c', 't', 1, 'i', epoch)
+      await store.settle('c', { ...streaming, status: 'done', text: 'Hi' }, epoch)
       const [settled] = (await store.load('c', seq - 1)).items
-      expect(settled).toMatchObject({ id: 't', seq, status: 'done', text: 'Salut' })
+      expect(settled).toMatchObject({ id: 't', seq, status: 'done', text: 'Hi' })
       await store.setHead('c', 'u', epoch)
       expect((await store.load('c', 0)).head).toBe('u')
     })
 
-    it('signale une interruption demandée aux écritures, jusqu’à son effacement', async () => {
+    it('reports a requested interruption to the writes, until it is cleared', async () => {
       const store = await make()
       const epoch = await claimed(store, 'c')
       await store.requestInterrupt('c')
       expect((await store.load('c', 0)).interruptRequested).toBe(true)
-      expect((await store.append('c', [message('a', 'un')], epoch)).interruptRequested).toBe(true)
+      expect((await store.append('c', [message('a', 'one')], epoch)).interruptRequested).toBe(true)
       await store.clearInterrupt('c', epoch)
       expect((await store.load('c', 0)).interruptRequested).toBe(false)
     })
 
-    // Le tour qui reprend une conversation après un arrêt règle l'élément ouvert avec ce texte.
-    it('relit un élément en flux avec ses lots recollés dans l’ordre, puis son texte final', async () => {
+    // The turn that resumes a conversation after a stop settles the open item with this text.
+    it('reads a streaming item again with its batches joined in order, then its final text', async () => {
       const store = await make()
       const epoch = await claimed(store, 'c')
       const open: ItemDraft = {
@@ -116,24 +116,24 @@ export function storeConformance(name: string, make: () => Store | Promise<Store
         audience: 'private',
       }
       await store.append('c', [open], epoch)
-      await store.appendBatch('c', 'r', 1, 'jour', epoch)
-      await store.appendBatch('c', 'r', 0, 'Bon', epoch)
+      await store.appendBatch('c', 'r', 1, 'lo', epoch)
+      await store.appendBatch('c', 'r', 0, 'Hel', epoch)
       expect((await store.load('c', 0)).items[0]).toMatchObject({
         status: 'streaming',
-        text: 'Bonjour',
+        text: 'Hello',
       })
-      await store.settle('c', { ...open, status: 'done', text: 'Bonjour !' }, epoch)
+      await store.settle('c', { ...open, status: 'done', text: 'Hello!' }, epoch)
       expect((await store.load('c', 0)).items[0]).toMatchObject({
         status: 'done',
-        text: 'Bonjour !',
+        text: 'Hello!',
       })
     })
 
-    it('garde le dernier instantané écrit', async () => {
+    it('keeps the last snapshot written', async () => {
       const store = await make()
       const epoch = await claimed(store, 'c')
       expect(await store.loadSnapshot('c')).toBeUndefined()
-      const [{ seq } = { seq: 0 }] = (await store.append('c', [message('a', 'un')], epoch))
+      const [{ seq } = { seq: 0 }] = (await store.append('c', [message('a', 'one')], epoch))
         .persisted
       const { items } = await store.load('c', 0)
       const snapshot: Snapshot = { schema: 1, seq, items }
@@ -146,11 +146,11 @@ export function storeConformance(name: string, make: () => Store | Promise<Store
 export type TransportPair = {
   client: ClientTransport
   server: ServerTransport
-  /** Libère ce que la fabrique a ouvert (serveur à l'écoute, processus). */
+  /** Releases what the factory opened (listening server, process). */
   close?: () => Promise<void>
 }
 
-/** Lit les `n` prochaines trames d'un flux. */
+/** Reads the next `n` frames of a stream. */
 async function take<F>(frames: AsyncIterator<F>, n: number): Promise<F[]> {
   const out: F[] = []
   while (out.length < n) {
@@ -162,11 +162,11 @@ async function take<F>(frames: AsyncIterator<F>, n: number): Promise<F[]> {
 }
 
 export function transportConformance(name: string, make: () => Promise<TransportPair>) {
-  describe(`conformité du transport : ${name}`, () => {
-    it('livre les trames dans l’ordre, dans les deux sens', async () => {
+  describe(`transport conformance: ${name}`, () => {
+    it('delivers the frames in order, in both directions', async () => {
       const pair = await make()
       const fromClient: ClientFrame[] = [
-        { kind: 'hello', version: 1, token: 'jeton' },
+        { kind: 'hello', version: 1, token: 'token' },
         { kind: 'subscribe', conversationId: 'c', fromSeq: 0 },
         { kind: 'ping' },
       ]
@@ -186,7 +186,7 @@ export function transportConformance(name: string, make: () => Promise<Transport
       await pair.close?.()
     })
 
-    it('termine la lecture du serveur quand le client ferme', async () => {
+    it('ends the server read when the client closes', async () => {
       const pair = await make()
       const serverFrames = pair.server.receive()[Symbol.asyncIterator]()
       await pair.client.send({ kind: 'ping' })
@@ -200,19 +200,19 @@ export function transportConformance(name: string, make: () => Promise<Transport
 }
 
 /**
- * Scénario que joue le faux fournisseur derrière l'adaptateur : `text` répond « Bonjour. » en
- * plusieurs morceaux, `tool_call` appelle `read_file` avec `{ path: 'a.txt' }` et le `callId`
- * `k1`, `failure` échoue de façon définitive, `endless` écrit du texte sans fin.
+ * Scenario played by the fake provider behind the adapter: `text` answers "Hello." in several
+ * chunks, `tool_call` calls `read_file` with `{ path: 'a.txt' }` and the `callId` `k1`, `failure`
+ * fails permanently, `endless` writes text without end.
  */
 export type ModelScenario = 'text' | 'tool_call' | 'failure' | 'endless'
 
 const request = {
   trigger: 'u',
-  path: [{ ...message('u', 'Bonjour'), seq: 1 }],
+  path: [{ ...message('u', 'Hello'), seq: 1 }],
   tools: [
     {
       name: 'read_file',
-      description: 'Lit un fichier texte.',
+      description: 'Reads a text file.',
       inputSchema: { type: 'object', properties: { path: { type: 'string' } } },
       channel: 'environment' as const,
     },
@@ -229,21 +229,21 @@ export function modelAdapterConformance(
   name: string,
   make: (scenario: ModelScenario) => ModelAdapter,
 ) {
-  describe(`conformité de l’adaptateur de modèle : ${name}`, () => {
-    it('rend le texte en deltas puis un seul message final, qui le reprend', async () => {
+  describe(`model adapter conformance: ${name}`, () => {
+    it('returns the text in deltas then a single final message, which repeats it', async () => {
       const chunks = await collect(make('text'))
       const done = chunks.filter((c) => c.type === 'done')
       expect(done).toHaveLength(1)
       expect(chunks.at(-1)?.type).toBe('done')
       const text = chunks.flatMap((c) => (c.type === 'text' ? [c.text] : [])).join('')
-      expect(text).toBe('Bonjour.')
+      expect(text).toBe('Hello.')
       expect(done[0]?.type === 'done' && done[0].message.parts).toContainEqual({
         type: 'text',
-        text: 'Bonjour.',
+        text: 'Hello.',
       })
     })
 
-    it('rend un appel d’outil avec son identifiant, son nom et son entrée', async () => {
+    it('returns a tool call with its identifier, its name and its input', async () => {
       const chunks = await collect(make('tool_call'))
       const done = chunks.at(-1)
       expect(done?.type).toBe('done')
@@ -257,11 +257,11 @@ export function modelAdapterConformance(
       )
     })
 
-    it('échoue par une erreur quand le fournisseur échoue', async () => {
+    it('fails with an error when the provider fails', async () => {
       await expect(collect(make('failure'))).rejects.toBeInstanceOf(Error)
     })
 
-    it('s’arrête sans message final quand le tour annule', async () => {
+    it('stops without a final message when the turn cancels', async () => {
       const abort = new AbortController()
       const seen: ModelChunk[] = []
       const run = (async () => {

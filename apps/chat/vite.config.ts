@@ -1,5 +1,5 @@
-// Compilation du chat : `WICA_TARGET=workers` produit l'application pour Cloudflare Workers,
-// sinon pour Node (Compose). `#platform` suit la condition `workerd` du plugin de Cloudflare.
+// Chat build: `WICA_TARGET=workers` produces the application for Cloudflare Workers, otherwise
+// for Node (Compose). `#platform` follows the `workerd` condition of the Cloudflare plugin.
 
 import { cloudflare } from '@cloudflare/vite-plugin'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'

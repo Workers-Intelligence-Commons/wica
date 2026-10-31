@@ -1,24 +1,24 @@
-// Identité : le reste de l'application ne voit qu'un `Principal`. Les clés d'API et le cookie
-// de session appartiennent à l'application ; un adaptateur configuré (amorçage, OIDC générique
-// ou proxy de confiance) reconnaît en plus les identités externes.
+// Identity: the rest of the application sees only a `Principal`. API keys and the session cookie
+// belong to the application; a configured adapter (bootstrap, generic OIDC or trusted proxy)
+// also recognizes external identities.
 //
-// Contrat des adaptateurs :
-// - Une identité externe est reliée à un compte interne par (fournisseur, sujet) ; toute
-//   référence pointe sur le compte interne.
-// - Les appartenances aux organisations suivent les claims à chaque connexion : une
-//   organisation absente des claims retire l'appartenance.
-// - Déconnexion : le cookie est effacé et la page rechargée ; un cookie volé reste valable
-//   jusqu'à son échéance, qui est courte. Un compte supprimé n'est plus reconnu.
-// - Révocation : une clé d'API révoquée n'est plus reconnue dès la requête suivante.
-// - Rafraîchissement : la session de l'application ne dépend pas du jeton du fournisseur ; à
-//   son échéance, la personne se reconnecte.
+// Adapter contract:
+// - An external identity is linked to an internal account by (provider, subject); every
+//   reference points to the internal account.
+// - Organization memberships follow the claims at each login: an organization absent from the
+//   claims removes the membership.
+// - Logout: the cookie is cleared and the page reloaded; a stolen cookie stays valid until it
+//   expires, which is soon. A deleted account is no longer recognized.
+// - Revocation: a revoked API key is no longer recognized from the next request on.
+// - Refresh: the application session does not depend on the provider token; when it expires,
+//   the person logs in again.
 
 import { createRemoteJWKSet, type JWTPayload, type JWTVerifyGetKey, jwtVerify } from 'jose'
 
 import { sha256Hex, sign, verify } from './crypto.ts'
 
 export type Principal = {
-  /** Identifiant interne stable : le compte, ou l'organisation d'une clé d'organisation. */
+  /** Stable internal identifier: the account, or the organization of an organization key. */
   id: string
   kind: 'user' | 'apiKey'
   orgs: { id: string; roles: string[] }[]
@@ -29,19 +29,19 @@ export interface AuthProvider {
   authenticate(req: Request): Promise<Principal | null>
 }
 
-/** Profil d'une identité externe, tel que l'adaptateur l'a lu dans ses claims. */
+/** Profile of an external identity, as the adapter read it from its claims. */
 export type ExternalProfile = {
   provider: string
   subject: string
   name: string
-  /** Organisations et rôles d'après les claims ; `undefined` laisse les appartenances telles quelles. */
+  /** Organizations and roles according to the claims; `undefined` leaves the memberships as they are. */
   orgs?: { name: string; roles: string[] }[]
 }
 
 export interface IdentityRepo {
   principal(userId: string): Promise<Principal | null>
   apiKey(hash: string): Promise<Principal | null>
-  /** Compte interne de l'identité, créé à la première connexion, appartenances à jour. */
+  /** Internal account of the identity, created at the first login, memberships up to date. */
   link(profile: ExternalProfile): Promise<string>
 }
 
@@ -61,7 +61,7 @@ const bearer = (req: Request) => {
   return header.toLowerCase().startsWith('bearer ') ? header.slice(7).trim() : undefined
 }
 
-/** Cookie de session signé, lié au compte interne. */
+/** Signed session cookie, linked to the internal account. */
 export async function sessionCookie(secret: string, userId: string, now = Date.now()) {
   const value = await sign(secret, { uid: userId, exp: now + SESSION_TTL_MS })
   return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL_MS / 1000}`
@@ -69,7 +69,7 @@ export async function sessionCookie(secret: string, userId: string, now = Date.n
 
 export const clearSessionCookie = `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
 
-/** Compte de la session du navigateur, si son cookie est signé et pas échu. */
+/** Account of the browser session, if its cookie is signed and not expired. */
 export async function sessionUser(secret: string, req: Request, now = Date.now()) {
   const value = readCookie(req, SESSION_COOKIE)
   if (!value) return null
@@ -77,19 +77,19 @@ export async function sessionUser(secret: string, req: Request, now = Date.now()
   return session && session.exp > now ? session.uid : null
 }
 
-/** Clé d'API de l'application, hachée en base ; préfixe `wica_`. */
+/** Application API key, hashed in the database; prefix `wica_`. */
 export const API_KEY_PREFIX = 'wica'
 export const hashKey = (token: string) => sha256Hex(token)
 
 export type AppAuthOptions = {
   repo: IdentityRepo
   sessionSecret: string
-  /** Adaptateur configuré, essayé après le cookie et les clés d'API. */
+  /** Configured adapter, tried after the cookie and the API keys. */
   adapter?: AuthProvider
   now?: () => number
 }
 
-/** Cookie de session, puis clé d'API, puis l'adaptateur configuré. */
+/** Session cookie, then API key, then the configured adapter. */
 export function appAuth(options: AppAuthOptions): AuthProvider {
   return {
     async authenticate(req) {
@@ -103,8 +103,8 @@ export function appAuth(options: AppAuthOptions): AuthProvider {
 }
 
 /**
- * Amorçage : un jeton d'admin initial, comparé en temps constant, pour créer les premiers
- * comptes et leurs clés. Ni mot de passe ni session propre.
+ * Bootstrap: an initial admin token, compared in constant time, to create the first accounts and
+ * their keys. No password and no session of its own.
  */
 export function bootstrapAuth(adminToken: string): AuthProvider {
   return {
@@ -117,7 +117,7 @@ export function bootstrapAuth(adminToken: string): AuthProvider {
 }
 
 async function sameSecret(a: string, b: string) {
-  // Comparer les empreintes égalise les longueurs ; la comparaison des octets est en temps constant.
+  // Comparing hashes equalizes the lengths; the byte comparison is in constant time.
   const [x, y] = await Promise.all([sha256Hex(a), sha256Hex(b)])
   let diff = 0
   for (let i = 0; i < x.length; i++) diff |= x.charCodeAt(i) ^ y.charCodeAt(i)
@@ -126,17 +126,17 @@ async function sameSecret(a: string, b: string) {
 
 export type OidcOptions = {
   issuer: string
-  /** Audience attendue : l'identifiant du client de l'application. */
+  /** Expected audience: the identifier of the application client. */
   audience: string
-  /** Algorithmes de signature acceptés ; `none` n'en fait jamais partie. */
+  /** Accepted signature algorithms; `none` is never one of them. */
   algorithms?: string[]
-  /** Décalage d'horloge toléré, en secondes. */
+  /** Tolerated clock skew, in seconds. */
   clockToleranceSec?: number
-  /** Claim des organisations : liste de noms, ou d'objets `{ name, roles }`. */
+  /** Organizations claim: list of names, or of `{ name, roles }` objects. */
   orgsClaim?: string
-  /** Claim des rôles, appliqués à chaque organisation quand le claim des organisations est une liste de noms. */
+  /** Roles claim, applied to each organization when the organizations claim is a list of names. */
   rolesClaim?: string
-  /** Clés publiques ; par défaut celles que publie l'émetteur (découverte). */
+  /** Public keys; by default the ones the issuer publishes (discovery). */
   keys?: JWTVerifyGetKey
   fetch?: typeof fetch
 }
@@ -156,7 +156,7 @@ export async function discover(issuer: string, f: typeof fetch = fetch): Promise
 
 const DEFAULT_ALGORITHMS = ['RS256', 'ES256', 'PS256', 'EdDSA']
 
-/** Organisations d'après les claims, ou `undefined` si l'émetteur n'en fournit pas. */
+/** Organizations according to the claims, or `undefined` if the issuer does not provide any. */
 export function orgsFromClaims(
   claims: JWTPayload,
   orgsClaim: string | undefined,
@@ -183,8 +183,8 @@ export function orgsFromClaims(
 }
 
 /**
- * Vérifie un jeton de l'émetteur : signature par ses clés publiques, émetteur, audience,
- * algorithme autorisé et échéance, avec le décalage d'horloge toléré.
+ * Verifies an issuer token: signature by its public keys, issuer, audience, allowed algorithm and
+ * expiry, with the tolerated clock skew.
  */
 export function oidcVerifier(options: OidcOptions) {
   let keys = options.keys
@@ -220,7 +220,7 @@ export function oidcVerifier(options: OidcOptions) {
   }
 }
 
-/** OIDC générique : un jeton d'accès de l'émetteur, en `Authorization: Bearer`. */
+/** Generic OIDC: an access token from the issuer, in `Authorization: Bearer`. */
 export function oidcAuth(repo: IdentityRepo, options: OidcOptions): AuthProvider {
   const verifyToken = oidcVerifier(options)
   return {
@@ -237,22 +237,22 @@ export function oidcAuth(repo: IdentityRepo, options: OidcOptions): AuthProvider
 }
 
 export type TrustedProxyOptions = {
-  /** En-tête qui porte le sujet authentifié par le proxy, par exemple `Remote-User`. */
+  /** Header that carries the subject authenticated by the proxy, for example `Remote-User`. */
   userHeader: string
   nameHeader?: string
-  /** En-tête des groupes, séparés par des virgules, lus comme des organisations. */
+  /** Groups header, separated by commas, read as organizations. */
   groupsHeader?: string
-  /** Adresses du proxy ; une requête d'ailleurs n'est jamais lue par ses en-têtes. */
+  /** Proxy addresses; a request from elsewhere is never read by its headers. */
   proxies: string[]
-  /** Adresse de la connexion entrante, fournie par l'hôte. */
+  /** Address of the incoming connection, provided by the host. */
   clientAddress: (req: Request) => string | undefined
   provider?: string
 }
 
 /**
- * Proxy de confiance : l'en-tête d'identité n'est lu que sur une connexion qui vient du
- * proxy. Une requête d'une autre adresse qui le porte est ignorée, pour qu'on ne puisse pas
- * s'en servir pour se faire passer pour quelqu'un d'autre.
+ * Trusted proxy: the identity header is read only on a connection that comes from the proxy. A
+ * request from another address that carries it is ignored, so that no one can use it to pass as
+ * someone else.
  */
 export function trustedProxyAuth(repo: IdentityRepo, options: TrustedProxyOptions): AuthProvider {
   return {
@@ -281,7 +281,7 @@ export function trustedProxyAuth(repo: IdentityRepo, options: TrustedProxyOption
   }
 }
 
-/** Requête d'autorisation OIDC avec PKCE : l'adresse où envoyer le navigateur, et ce qu'il faut garder. */
+/** OIDC authorization request with PKCE: the address to send the browser to, and what to keep. */
 export async function authorizationRequest(
   discovery: OidcDiscovery,
   client: { clientId: string; redirectUri: string; scope?: string },
@@ -302,7 +302,7 @@ export async function authorizationRequest(
   return { url: url.toString(), verifier, state }
 }
 
-/** Échange le code contre un jeton d'identité, puis le vérifie comme tout jeton de l'émetteur. */
+/** Exchanges the code for an identity token, then verifies it like any issuer token. */
 export async function exchangeCode(
   discovery: OidcDiscovery,
   client: { clientId: string; clientSecret?: string; redirectUri: string },

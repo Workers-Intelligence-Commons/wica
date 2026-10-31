@@ -4,18 +4,18 @@ import { decrypt, encrypt, instanceKey, sign, verify } from '../src/server/crypt
 
 const keyOf = (byte: number) => instanceKey(Buffer.alloc(32, byte).toString('base64'))
 
-describe('chiffrement des jetons de modèle', () => {
-  it('rend le jeton chiffré avec la clé de l’instance', async () => {
+describe('encryption of model tokens', () => {
+  it('returns the token encrypted with the instance key', async () => {
     const key = await keyOf(1)
     const sealed = await encrypt(key, 'sk-secret')
     expect(sealed.ciphertext).not.toContain('sk-secret')
     expect(await decrypt(key, sealed)).toBe('sk-secret')
   })
 
-  it('refuse un contenu modifié ou une autre clé', async () => {
+  it('refuses modified content or another key', async () => {
     const key = await keyOf(1)
     const sealed = await encrypt(key, 'sk-secret')
-    // Un caractère du milieu porte 6 bits de données ; le dernier peut ne porter que du remplissage.
+    // A middle character carries 6 bits of data; the last one may carry only padding.
     const middle = Math.floor(sealed.ciphertext.length / 2)
     const flipped = sealed.ciphertext[middle] === 'A' ? 'B' : 'A'
     const tampered = {
@@ -28,11 +28,11 @@ describe('chiffrement des jetons de modèle', () => {
   })
 })
 
-describe('valeurs signées', () => {
-  it('rend la valeur signée et refuse une signature modifiée', async () => {
+describe('signed values', () => {
+  it('returns the signed value and refuses a modified signature', async () => {
     const signed = await sign('secret', { uid: 'u1' })
     expect(await verify('secret', signed)).toEqual({ uid: 'u1' })
-    expect(await verify('autre', signed)).toBeNull()
+    expect(await verify('other', signed)).toBeNull()
     expect(await verify('secret', `${signed}x`)).toBeNull()
   })
 })

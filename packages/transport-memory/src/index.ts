@@ -1,4 +1,4 @@
-// Transport en mémoire : client et serveur dans le même processus.
+// In-memory transport: client and server in the same process.
 
 import type { ClientTransport, Frame, ServerTransport, Transport } from '@wica/protocol'
 
@@ -39,7 +39,7 @@ function end<Out extends Frame, In extends Frame>(
   outbox: Queue<Out>,
 ): Transport<Out, In> {
   return {
-    // Copie structurée : les deux côtés ne partagent jamais un objet, comme sur un vrai réseau.
+    // Structured copy: the two sides never share an object, as on a real network.
     send: async (frame) => outbox.push(structuredClone(frame)),
     receive: () => inbox.iterate(),
     close: async () => {
@@ -49,7 +49,7 @@ function end<Out extends Frame, In extends Frame>(
   }
 }
 
-/** Deux extrémités reliées : ce que l'une envoie, l'autre le reçoit. */
+/** Two linked ends: what one sends, the other receives. */
 export function memoryTransportPair(): { client: ClientTransport; server: ServerTransport } {
   const toServer = new Queue<Parameters<ClientTransport['send']>[0]>()
   const toClient = new Queue<Parameters<ServerTransport['send']>[0]>()

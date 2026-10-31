@@ -21,7 +21,7 @@ const tools: ToolSpec[] = [
   { name: 'ask_user', description: '', inputSchema: {}, channel: 'user', speaker: 'user' },
 ]
 
-/** Hôte minimal : accuse chaque `persist` comme le ferait un Store, et collecte les intentions. */
+/** Minimal host: acknowledges each `persist` as a Store would, and collects the intents. */
 function host(init?: Partial<Parameters<typeof initialState>[0]>) {
   let state = initialState({ conversationId: 'c', salt: 's', ...init })
   let seq = state.maxSeq
@@ -56,9 +56,9 @@ const kinds = (intents: Intent[]) => intents.map((i) => i.t)
 const journal = (s: State) => pathTo(s.items, s.head)
 
 describe('step', () => {
-  it("demande un appel au modèle après un message, précédé de l'instantané des outils", () => {
+  it('asks for a model call after a message, preceded by the tool snapshot', () => {
     const h = host()
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Bonjour' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Hello' }] })
     const message = h.state.head
     const intents = h.send({ t: 'resume' })
     expect(kinds(intents)).toEqual(['persist', 'call_model'])
@@ -73,22 +73,22 @@ describe('step', () => {
     expect(call.request.tools).toEqual(tools)
   })
 
-  it("écrit le texte en flux puis le règle, et promeut le texte d'une réponse sans outil", () => {
+  it('writes the streaming text then settles it, and promotes the text of a response without a tool', () => {
     const h = host()
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Bonjour' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Hello' }] })
     h.send({ t: 'resume' })
-    const first = h.send({ t: 'model_delta', delta: { type: 'text', text: 'Sal' } })
+    const first = h.send({ t: 'model_delta', delta: { type: 'text', text: 'H' } })
     expect(kinds(first)).toEqual(['persist', 'append_delta'])
     expect((first[0] as Extract<Intent, { t: 'persist' }>).items[0]?.status).toBe('streaming')
-    expect(kinds(h.send({ t: 'model_delta', delta: { type: 'text', text: 'ut' } }))).toEqual([
+    expect(kinds(h.send({ t: 'model_delta', delta: { type: 'text', text: 'i' } }))).toEqual([
       'append_delta',
     ])
-    const done = h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Salut' }] } })
+    const done = h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Hi' }] } })
     expect(kinds(done)).toEqual(['settle'])
     const reply = journal(h.state).at(-1)
     expect(reply).toMatchObject({
       kind: 'assistant_text',
-      text: 'Salut',
+      text: 'Hi',
       audience: 'user',
       status: 'done',
       meta: { promoted: true },
@@ -96,15 +96,15 @@ describe('step', () => {
     expect(kinds(h.send({ t: 'resume' }))).toEqual([])
   })
 
-  it("garde privé le texte qui précède des appels d'outils, puis lance l'outil", () => {
+  it('keeps private the text that precedes tool calls, then starts the tool', () => {
     const h = host()
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Lis a.txt' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Read a.txt' }] })
     h.send({ t: 'resume' })
     h.send({
       t: 'model_done',
       message: {
         parts: [
-          { type: 'text', text: 'Je regarde.' },
+          { type: 'text', text: 'Looking.' },
           { type: 'tool_call', callId: 'k1', tool: 'read_file', input: { path: 'a.txt' } },
         ],
       },
@@ -118,69 +118,69 @@ describe('step', () => {
         call: { callId: 'k1', tool: 'read_file', input: { path: 'a.txt' }, channel: 'environment' },
       },
     ])
-    h.send({ t: 'tool_result', callId: 'k1', output: [{ type: 'text', text: 'contenu' }] })
+    h.send({ t: 'tool_result', callId: 'k1', output: [{ type: 'text', text: 'content' }] })
     expect(kinds(h.send({ t: 'resume' }))).toEqual(['call_model'])
     expect(journalViolations(h.state.items)).toEqual([])
   })
 
-  it('attend la personne pour un appel du canal utilisateur, et rend sa réponse comme sa parole', () => {
+  it('waits for the person on a user channel call, and returns their answer as their speech', () => {
     const h = host()
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Range' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Tidy up' }] })
     h.send({ t: 'resume' })
     h.send({
       t: 'model_done',
       message: {
-        parts: [{ type: 'tool_call', callId: 'q1', tool: 'ask_user', input: { q: 'Où ?' } }],
+        parts: [{ type: 'tool_call', callId: 'q1', tool: 'ask_user', input: { q: 'Where?' } }],
       },
     })
     expect(kinds(h.send({ t: 'resume' }))).toEqual(['ask_user'])
     h.send({
       t: 'tool_result',
       callId: 'q1',
-      output: [{ type: 'text', text: 'Dans /tmp' }],
+      output: [{ type: 'text', text: 'In /tmp' }],
       from: { channel: 'web', author: 'alice', trust: 'owner' },
     })
     expect(journal(h.state).at(-1)).toMatchObject({ kind: 'tool_result', as: 'user' })
   })
 
-  it('règle en interrupted un flux laissé ouvert par un tour perdu, en gardant son texte', () => {
+  it('settles as interrupted a stream left open by a lost turn, keeping its text', () => {
     const h = host()
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Bonjour' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Hello' }] })
     h.send({ t: 'resume' })
-    h.send({ t: 'model_delta', delta: { type: 'text', text: 'Début' } })
-    // Le tour suivant reconstruit son état depuis le Store, où l'élément est resté en streaming.
+    h.send({ t: 'model_delta', delta: { type: 'text', text: 'Start' } })
+    // The next turn rebuilds its state from the Store, where the item stayed in streaming.
     const stored: Item[] = h.state.items.map((i) =>
-      i.kind === 'assistant_text' ? { ...i, text: 'Début' } : i,
+      i.kind === 'assistant_text' ? { ...i, text: 'Start' } : i,
     )
     const next = host({ items: stored, head: h.state.head })
     const intents = next.send({ t: 'resume' })
     expect(kinds(intents)).toEqual(['settle'])
     expect((intents[0] as { item: ItemDraft }).item).toMatchObject({
       status: 'interrupted',
-      text: 'Début',
+      text: 'Start',
       audience: 'user',
     })
   })
 
-  // La personne a vu ce texte s'écrire : interrompu, il reste le sien, et l'écran le montre.
-  it('adresse à la personne le texte d’une réponse interrompue', () => {
+  // The person saw this text being written: interrupted, it stays theirs, and the screen shows it.
+  it('addresses the text of an interrupted response to the person', () => {
     for (const freeText of ['user_tool', 'direct'] as const) {
       const h = host({ policy: { freeText } })
-      h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Bonjour' }] })
+      h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Hello' }] })
       h.send({ t: 'resume' })
-      h.send({ t: 'model_delta', delta: { type: 'text', text: 'Début' } })
+      h.send({ t: 'model_delta', delta: { type: 'text', text: 'Start' } })
       h.send({ t: 'interrupt' })
       expect(journal(h.state).find((i) => i.kind === 'assistant_text')).toMatchObject({
         status: 'interrupted',
-        text: 'Début',
+        text: 'Start',
         audience: 'user',
       })
     }
   })
 
-  it("interrompt proprement : flux réglé et résultat d'erreur pour chaque appel sans résultat", () => {
+  it('interrupts cleanly: stream settled and an error result for each call without a result', () => {
     const h = host()
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Lis' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Read' }] })
     h.send({ t: 'resume' })
     h.send({
       t: 'model_done',
@@ -194,29 +194,29 @@ describe('step', () => {
     expect(journalViolations(h.state.items)).toEqual([])
   })
 
-  it("ne duplique pas un message renvoyé à l'identique", () => {
+  it('does not duplicate a message sent again identically', () => {
     const h = host()
     const msg: Body = {
       t: 'user_message',
       parentId: null,
-      parts: [{ type: 'text', text: 'Bonjour' }],
+      parts: [{ type: 'text', text: 'Hello' }],
     }
     h.send(msg)
     expect(h.send(msg)).toEqual([])
     expect(h.state.items.filter((i) => i.kind === 'user_message')).toHaveLength(1)
   })
 
-  it("rejoue de façon déterministe, y compris après une sérialisation JSON de l'état", () => {
+  it('replays deterministically, including after a JSON serialization of the state', () => {
     const events: Body[] = [
-      { t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Lis' }] },
+      { t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Read' }] },
       { t: 'resume' },
-      { t: 'model_delta', delta: { type: 'text', text: 'Je ' } },
-      { t: 'model_delta', delta: { type: 'text', text: 'lis.' } },
+      { t: 'model_delta', delta: { type: 'text', text: 'Read' } },
+      { t: 'model_delta', delta: { type: 'text', text: 'ing.' } },
       {
         t: 'model_done',
         message: {
           parts: [
-            { type: 'text', text: 'Je lis.' },
+            { type: 'text', text: 'Reading.' },
             { type: 'tool_call', callId: 'k1', tool: 'read_file', input: { path: 'a' } },
           ],
         },
@@ -241,12 +241,12 @@ describe('step', () => {
 })
 
 describe('settled', () => {
-  // Un client sait que le serveur ne doit plus rien à la conversation, sans attendre un signal
-  // qui peut manquer entre deux tours d'un même message.
-  it('suit le travail que le journal attend encore, jusqu’à la réponse finale', () => {
+  // A client knows that the server owes nothing more to the conversation, without waiting for a
+  // signal that can be missed between two turns of the same message.
+  it('follows the work the journal still waits for, until the final response', () => {
     const h = host()
     const now = () => settled(h.state.items, h.state.head)
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Lis a.txt' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Read a.txt' }] })
     expect(now()).toBe(false)
     h.send({ t: 'resume' })
     h.send({
@@ -254,16 +254,16 @@ describe('settled', () => {
       message: { parts: [{ type: 'tool_call', callId: 'k1', tool: 'read_file', input: {} }] },
     })
     expect(now()).toBe(false)
-    h.send({ t: 'tool_result', callId: 'k1', output: [{ type: 'text', text: 'contenu' }] })
+    h.send({ t: 'tool_result', callId: 'k1', output: [{ type: 'text', text: 'content' }] })
     expect(now()).toBe(false)
     h.send({ t: 'resume' })
-    h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Voilà.' }] } })
+    h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'There.' }] } })
     expect(now()).toBe(true)
   })
 
-  it('est au repos après une interruption, qui ferme les appels ouverts', () => {
+  it('is at rest after an interruption, which closes the open calls', () => {
     const h = host()
-    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Lis' }] })
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Read' }] })
     h.send({ t: 'resume' })
     h.send({
       t: 'model_done',

@@ -1,7 +1,7 @@
-// Porte de l'étape 7 : un serveur distant suit la boîte
-// de commandes de l'hôte par une connexion sortante et écrit par le `Store` de l'hôte. Une
-// coupure en plein outil laisse l'outil se terminer ; le résultat est écrit au retour du réseau,
-// et le client reprend depuis son dernier `seq` sans doublon.
+// Step 7 gate: a remote server follows the host's command inbox through an outgoing connection
+// and writes through the host's `Store`. A disconnection in the middle of a tool lets the tool
+// finish; the result is written when the network returns, and the client resumes from its last
+// `seq` without duplicates.
 
 import { type Client, createClient, deriveView } from '@wica/client'
 import { journalViolations } from '@wica/core'
@@ -15,7 +15,7 @@ import { scriptedModel } from '../src/index.ts'
 
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-/** Le `Store` de l'hôte vu à travers un réseau qu'on peut couper. */
+/** The host's `Store` seen through a network that can be cut. */
 function network(store: Store) {
   const link = { offline: false }
   const remote = new Proxy(store, {
@@ -23,7 +23,7 @@ function network(store: Store) {
       const value: unknown = Reflect.get(target, property)
       if (typeof value !== 'function') return value
       return async (...args: unknown[]) => {
-        if (link.offline) throw new TypeError('réseau coupé')
+        if (link.offline) throw new TypeError('network down')
         return (value as (...a: unknown[]) => Promise<unknown>).apply(target, args)
       }
     },
@@ -35,14 +35,14 @@ function until(ready: () => boolean | Promise<boolean>, ms = 3000) {
   return (async () => {
     const deadline = Date.now() + ms
     while (!(await ready())) {
-      if (Date.now() > deadline) throw new Error('délai dépassé')
+      if (Date.now() > deadline) throw new Error('timed out')
       await pause(5)
     }
   })()
 }
 
-describe('étape 7', () => {
-  it('termine l’outil pendant une coupure, écrit au retour, et le client rattrape sans doublon', async () => {
+describe('step 7', () => {
+  it('finishes the tool during a disconnection, writes on return, and the client catches up without duplicates', async () => {
     const host = new MemoryStore()
     const { remote, link } = network(host)
     const inbox = new MemoryCommandInbox()
@@ -55,7 +55,7 @@ describe('étape 7', () => {
     const longTask: Tool = {
       spec: {
         name: 'long_task',
-        description: 'Une tâche longue.',
+        description: 'A long task.',
         inputSchema: { type: 'object' },
         annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
         channel: 'environment',
@@ -65,15 +65,15 @@ describe('étape 7', () => {
         started = true
         await released
         aborted = ctx.signal.aborted
-        return [{ type: 'text', text: 'terminé' }]
+        return [{ type: 'text', text: 'finished' }]
       },
     }
     const model = scriptedModel((request) =>
       request.path.some((i) => i.kind === 'tool_result')
-        ? { parts: [{ type: 'text', text: 'Fini.' }] }
+        ? { parts: [{ type: 'text', text: 'Finished.' }] }
         : { parts: [{ type: 'tool_call', callId: 'k1', tool: 'long_task', input: {} }] },
     )
-    // Le serveur distant : un bail court, qui échoit pendant la coupure sans que rien ne casse.
+    // The remote server: a short lease, which expires during the disconnection without anything breaking.
     const server = createHarness({
       model,
       tools: [longTask],
@@ -84,7 +84,7 @@ describe('étape 7', () => {
     const transport = inboxTransport(inbox, { baseDelayMs: 5 })
     void server.serve(transport)
 
-    // L'hôte sert la lecture aux clients depuis son propre `Store`.
+    // The host serves reading to the clients from its own `Store`.
     const reader = createHarness({ model: scriptedModel(() => ({ parts: [] })), store: host })
     const listening = await listenWebSocket(
       { port: 0, host: '127.0.0.1' },
@@ -103,11 +103,11 @@ describe('étape 7', () => {
       commandId: 'cmd-1',
       clientSeq: 1,
       conversationId: 'c1',
-      command: { t: 'send', parentId: null, parts: [{ type: 'text', text: 'Lance la tâche' }] },
+      command: { t: 'send', parentId: null, parts: [{ type: 'text', text: 'Start the task' }] },
     })
     await until(() => started)
 
-    // Coupure complète en plein outil : la boîte, le `Store` distant et le client.
+    // Complete disconnection in the middle of a tool: the inbox, the remote `Store` and the client.
     inbox.cut({ offline: true })
     link.offline = true
     listening.dropConnections()
@@ -119,10 +119,10 @@ describe('étape 7', () => {
     inbox.reconnect()
     await until(async () =>
       (await host.load('c1', 0)).items.some(
-        (i) => i.kind === 'assistant_text' && i.text === 'Fini.' && i.status === 'done',
+        (i) => i.kind === 'assistant_text' && i.text === 'Finished.' && i.status === 'done',
       ),
     )
-    // La synchro de l'hôte livre la suite : le client reprend depuis son dernier `seq`.
+    // The host sync delivers what follows: the client resumes from its last `seq`.
     const before = reopened
     listening.dropConnections()
     await until(() => reopened > before)
@@ -132,7 +132,7 @@ describe('étape 7', () => {
     expect(aborted).toBe(false)
     expect(runs).toBe(1)
     expect(items.filter((i) => i.kind === 'tool_result')).toMatchObject([
-      { callId: 'k1', output: [{ type: 'text', text: 'terminé' }] },
+      { callId: 'k1', output: [{ type: 'text', text: 'finished' }] },
     ])
     expect(client.view('c1').entries).toEqual(deriveView(items, head).entries)
     expect(new Set(items.map((i) => i.id)).size).toBe(items.length)

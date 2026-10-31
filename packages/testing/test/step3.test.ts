@@ -1,6 +1,6 @@
-// Porte de l'étape 3 : une tâche à plusieurs outils
-// menée par le Harness à travers `model-compat` et `codecs`, devant un faux service Open Responses
-// qui rejoue un scénario ; la réponse de la personne est rendue en Open Responses.
+// Step 3 gate: a task with several tools carried out by the Harness through `model-compat` and
+// `codecs`, in front of a fake Open Responses service that replays a scenario; the person's
+// answer is rendered in Open Responses.
 
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -22,7 +22,7 @@ type Body = {
   input: { type: string; role?: string; call_id?: string; output?: unknown; content?: unknown }[]
   store: boolean
 }
-/** Faux service : la réponse dépend du nombre de résultats d'outils déjà reçus. */
+/** Fake service: the response depends on the number of tool results already received. */
 function fakeService() {
   const bodies: Body[] = []
   const fetch = async (_url: string | URL | Request, init?: RequestInit) => {
@@ -35,11 +35,11 @@ function fakeService() {
           type: 'reasoning',
           id: 'rs',
           summary: [],
-          content: [{ type: 'reasoning_text', text: 'Lire puis demander.' }],
+          content: [{ type: 'reasoning_text', text: 'Read, then ask.' }],
           encrypted_content: 'E1',
         },
         openResponsesCall('k1', 'read_file', { path: 'notes.txt' }),
-        openResponsesCall('k2', 'ask_user', { kind: 'confirm', question: 'Écrire todo.txt ?' }),
+        openResponsesCall('k2', 'ask_user', { kind: 'confirm', question: 'Write todo.txt?' }),
       ])
     }
     if (outputs === 2) {
@@ -50,16 +50,16 @@ function fakeService() {
       ])
     }
     if (outputs === 3)
-      return openResponsesStream([openResponsesCall('k4', 'say', { text: "C'est fait." })])
-    return openResponsesStream([openResponsesMessage('Fin.')])
+      return openResponsesStream([openResponsesCall('k4', 'say', { text: 'Done.' })])
+    return openResponsesStream([openResponsesMessage('End.')])
   }
   return { bodies, fetch: fetch as typeof globalThis.fetch }
 }
 
-describe('étape 3', () => {
-  it('mène une tâche à plusieurs outils à travers model-compat, avec une réponse de la personne', async () => {
+describe('step 3', () => {
+  it('carries out a task with several tools through model-compat, with an answer from the person', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'wica-step3-'))
-    await writeFile(join(dir, 'notes.txt'), 'acheter du pain')
+    await writeFile(join(dir, 'notes.txt'), 'buy bread')
     const service = fakeService()
     const harness = createHarness({
       model: openResponsesModel({
@@ -70,7 +70,7 @@ describe('étape 3', () => {
       tools: [...nodeTools({ roots: [dir] }), ...userTools],
       authorize: allowAll,
       renderAnswer,
-      instructions: 'Tu aides à ranger des fichiers.',
+      instructions: 'You help tidy up files.',
     })
     const { client: end, server } = memoryTransportPair()
     void harness.serve(server)
@@ -80,7 +80,7 @@ describe('étape 3', () => {
 
     const changed = (ready: () => boolean) =>
       new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('délai dépassé')), 2000)
+        const timer = setTimeout(() => reject(new Error('timed out')), 2000)
         const check = () => {
           if (!ready()) return
           clearTimeout(timer)
@@ -91,34 +91,34 @@ describe('étape 3', () => {
         check()
       })
 
-    await client.send('c1', 'Copie notes.txt dans todo.txt')
+    await client.send('c1', 'Copy notes.txt into todo.txt')
     await changed(() => client.view('c1').waiting.length > 0)
     const [question] = client.view('c1').waiting
     expect(question).toMatchObject({ tool: 'ask_user', input: { kind: 'confirm' } })
     await client.answer('c1', question!.callId, { kind: 'confirm', yes: true })
 
     await changed(() =>
-      client.view('c1').entries.some((e) => e.type === 'assistant' && e.text === 'Fin.'),
+      client.view('c1').entries.some((e) => e.type === 'assistant' && e.text === 'End.'),
     )
-    expect(await readFile(join(dir, 'todo.txt'), 'utf8')).toBe('acheter du pain')
+    expect(await readFile(join(dir, 'todo.txt'), 'utf8')).toBe('buy bread')
 
-    // La réponse de la personne : un résultat minimal, puis sa parole en tour utilisateur.
+    // The person's answer: a minimal result, then their speech as a user turn.
     const second = service.bodies[1]!
     const tail = second.input.slice(-3)
     expect(tail).toEqual([
       {
         type: 'function_call_output',
         call_id: 'k1',
-        output: [{ type: 'input_text', text: 'acheter du pain' }],
+        output: [{ type: 'input_text', text: 'buy bread' }],
       },
       {
         type: 'function_call_output',
         call_id: 'k2',
         output: [{ type: 'input_text', text: USER_REPLY_ACK }],
       },
-      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Oui.' }] },
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Yes.' }] },
     ])
-    // Le raisonnement chiffré revient au même fournisseur ; aucun état n'est gardé chez lui.
+    // The encrypted reasoning goes back to the same provider; no state is kept on its side.
     expect(second.input).toContainEqual({ type: 'reasoning', summary: [], encrypted_content: 'E1' })
     expect(service.bodies.every((b) => b.store === false)).toBe(true)
     expect(service.bodies).toHaveLength(4)
@@ -132,18 +132,18 @@ describe('étape 3', () => {
       'say',
       'assistant',
     ])
-    expect(view.entries.find((e) => e.type === 'say')).toMatchObject({ text: "C'est fait." })
+    expect(view.entries.find((e) => e.type === 'say')).toMatchObject({ text: 'Done.' })
     expect(journalViolations((await harness.store.load('c1', 0)).items)).toEqual([])
     await client.close()
   })
 
-  it('réessaie un service passagèrement indisponible, puis signale un refus définitif', async () => {
+  it('retries a transiently unavailable service, then reports a permanent refusal', async () => {
     let calls = 0
     const flaky = (async () => {
       calls += 1
       return calls === 1
-        ? new Response('occupé', { status: 503 })
-        : openResponsesStream([openResponsesMessage('Bonjour.')])
+        ? new Response('busy', { status: 503 })
+        : openResponsesStream([openResponsesMessage('Hello.')])
     }) as typeof fetch
     const ok = openResponsesModel({ baseUrl: 'http://s/v1', model: 'm', fetch: flaky })
     const chunks = []
@@ -155,12 +155,12 @@ describe('étape 3', () => {
     expect(calls).toBe(2)
     expect(chunks.at(-1)).toMatchObject({
       type: 'done',
-      message: { parts: [{ type: 'text', text: 'Bonjour.' }] },
+      message: { parts: [{ type: 'text', text: 'Hello.' }] },
     })
 
     const refused = (async () =>
       new Response(
-        JSON.stringify({ error: { message: 'modèle inconnu', code: 'model_not_found' } }),
+        JSON.stringify({ error: { message: 'unknown model', code: 'model_not_found' } }),
         { status: 404 },
       )) as typeof fetch
     const harness = createHarness({
@@ -168,10 +168,10 @@ describe('étape 3', () => {
       authorize: allowAll,
     })
     const seen: string[] = []
-    for await (const event of harness.run('Bonjour', { conversationId: 'e1' })) {
+    for await (const event of harness.run('Hello', { conversationId: 'e1' })) {
       if (event.type === 'error') seen.push(event.message)
     }
-    expect(seen).toEqual(['modèle inconnu'])
+    expect(seen).toEqual(['unknown model'])
     const bad = openResponsesModel({ baseUrl: 'http://s/v1', model: 'm', fetch: refused })
     await expect(
       (async () => {

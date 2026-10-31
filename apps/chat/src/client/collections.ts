@@ -1,6 +1,6 @@
-// Collections synchronisées du navigateur. Dans le navigateur, chacune suit une shape Electric
-// servie par le proxy de l'application et garde ses lignes dans le cache local ; pendant le rendu
-// serveur, elle lit ses lignes dans Postgres, sans Electric.
+// Synchronized browser collections. In the browser, each one follows an Electric shape served by
+// the application proxy and keeps its rows in the local cache; during server rendering, it reads
+// its rows from Postgres, without Electric.
 
 import { type CollectionConfig, collectionOptions, type DbClient } from '@tanstack/react-db'
 import { electricCollectionOptions } from '@tanstack/electric-db-collection'
@@ -35,25 +35,25 @@ export type ServerRow = {
 
 export type ItemShapeRow = Omit<ItemRow, 'blob_sha256'>
 
-/** Dépendances que le `DbClient` du navigateur reçoit : fichiers du cache déjà ouverts. */
+/** Dependencies the browser `DbClient` receives: cache files already opened. */
 export type BrowserDependencies = {
-  /** Persistance du fichier `name`, ouverte avant le rendu qui en a besoin ; `null` sans cache. */
+  /** Persistence of the `name` file, opened before the render that needs it; `null` without cache. */
   cache: (name: string) => CachePersistence | null
   account: string
 }
 
 export type ShapeTable = 'conversations' | 'servers' | 'items' | 'item_chunks'
 
-/** Lignes d'une table pour le rendu serveur, fournies par le serveur du chat. */
+/** Rows of a table for server rendering, provided by the chat server. */
 export type ServerRows = (table: ShapeTable, conversationId?: string) => Promise<readonly unknown[]>
 
 const SCHEMA_VERSION = 1
-/** Attente de la synchro avant d'afficher le cache local. */
+/** Wait for the sync before showing the local cache. */
 const CACHE_RENDER_AFTER_MS = 1_500
 /**
- * Délai après lequel une conversation quittée cesse de suivre ses shapes. Chaque suivi garde une
- * connexion ouverte, et un navigateur n'en ouvre que 6 par origine en HTTP/1.1 : au-delà, les
- * commandes attendent qu'une se libère.
+ * Delay after which a conversation that was left stops following its shapes. Each follow keeps a
+ * connection open, and a browser opens only 6 of them per origin over HTTP/1.1: beyond that,
+ * commands wait for one to free up.
  */
 const CONVERSATION_GC_MS = 5_000
 
@@ -94,7 +94,7 @@ function synced<T extends Record<string, unknown>>(
   })
   const persistence = cacheFile ? deps.cache(cacheFile) : null
   if (!persistence) return electric
-  // Sans réponse de la synchro dans ce délai, l'écran s'ouvre sur les lignes du cache.
+  // Without an answer from the sync within this delay, the screen opens on the cached rows.
   return persistedCollectionOptions({
     ...electric,
     persistence,
@@ -123,7 +123,7 @@ export const serversCollection = collectionOptions('servers', (client) =>
   synced<ServerRow>(client, 'servers', 'servers', (r) => r.id, accountFile(client)),
 )
 
-/** Un descripteur par conversation, gardé : chaque rendu retrouve le même objet. */
+/** One descriptor per conversation, kept: each render finds the same object. */
 const perConversation = <T>(make: (conversationId: string) => T) => {
   const made = new Map<string, T>()
   return (conversationId: string): T => {

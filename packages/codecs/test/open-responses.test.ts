@@ -15,28 +15,28 @@ const item = (id: string, body: ItemBody, extra: Partial<Item> = {}): Item =>
 
 const spec = (name: string, channel: 'environment' | 'user' = 'environment'): ToolSpec => ({
   name,
-  description: `outil ${name}`,
+  description: `tool ${name}`,
   inputSchema: { type: 'object' },
   channel,
 })
 
 const options = { model: 'wpt', provider: 'wic-serving' }
 
-describe('requête Open Responses', () => {
-  it('rend le chemin dans l’ordre des appels, la parole de la personne après les résultats, sans les approbations', () => {
+describe('Open Responses request', () => {
+  it('returns the path in the order of the calls, speech from the person after the results, without the approvals', () => {
     const path: Item[] = [
-      item('u1', { kind: 'user_message', parts: [{ type: 'text', text: 'Range' }] }),
+      item('u1', { kind: 'user_message', parts: [{ type: 'text', text: 'Tidy up' }] }),
       item('r1', {
         kind: 'reasoning',
-        text: 'je réfléchis',
+        text: 'thinking',
         opaque: { provider: 'wic-serving', data: { encrypted_content: 'abc' } },
       }),
       item('r2', {
         kind: 'reasoning',
-        text: 'autre fournisseur',
-        opaque: { provider: 'ailleurs', data: { encrypted_content: 'zzz' } },
+        text: 'other provider',
+        opaque: { provider: 'elsewhere', data: { encrypted_content: 'zzz' } },
       }),
-      item('a1', { kind: 'assistant_text', text: 'Je regarde.', audience: 'private' }),
+      item('a1', { kind: 'assistant_text', text: 'Looking.', audience: 'private' }),
       item('c1', {
         kind: 'tool_call',
         callId: 'k1',
@@ -58,7 +58,7 @@ describe('requête Open Responses', () => {
         input: { q: '?' },
         channel: 'user',
       }),
-      // Arrivée dans le désordre, avec une approbation du Harness au milieu.
+      // Arrival out of order, with a Harness approval in the middle.
       item('x2', {
         kind: 'tool_call',
         callId: 'approve:k2',
@@ -69,20 +69,24 @@ describe('requête Open Responses', () => {
       item('y2', {
         kind: 'tool_result',
         callId: 'approve:k2',
-        output: [{ type: 'text', text: 'Accordé.' }],
+        output: [{ type: 'text', text: 'Granted.' }],
         as: 'user',
       }),
       item('s3', {
         kind: 'tool_result',
         callId: 'k3',
-        output: [{ type: 'text', text: 'Fais plutôt B' }],
+        output: [{ type: 'text', text: 'Do B instead' }],
         as: 'user',
       }),
-      item('s2', { kind: 'tool_result', callId: 'k2', output: [{ type: 'text', text: 'écrit' }] }),
+      item('s2', {
+        kind: 'tool_result',
+        callId: 'k2',
+        output: [{ type: 'text', text: 'written' }],
+      }),
       item('s1', {
         kind: 'tool_result',
         callId: 'k1',
-        output: [{ type: 'text', text: 'contenu' }],
+        output: [{ type: 'text', text: 'content' }],
       }),
       item('e1', { kind: 'event', name: 'tools_changed', data: { tools: [] } }),
     ]
@@ -91,25 +95,25 @@ describe('requête Open Responses', () => {
         trigger: 's1',
         path,
         tools: [spec('read'), spec('write'), spec('ask_user', 'user')],
-        instructions: 'Sois bref.',
+        instructions: 'Be brief.',
       },
       options,
     )
     expect(body).toMatchObject({
       model: 'wpt',
-      instructions: 'Sois bref.',
+      instructions: 'Be brief.',
       stream: true,
       store: false,
     })
     expect(body).not.toHaveProperty('previous_response_id')
     expect(body.tools?.map((t) => t.name)).toEqual(['read', 'write', 'ask_user'])
     expect(body.input).toEqual([
-      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Range' }] },
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Tidy up' }] },
       { type: 'reasoning', summary: [], encrypted_content: 'abc' },
       {
         type: 'message',
         role: 'assistant',
-        content: [{ type: 'output_text', text: 'Je regarde.' }],
+        content: [{ type: 'output_text', text: 'Looking.' }],
       },
       { type: 'function_call', call_id: 'k1', name: 'read', arguments: '{"p":1}' },
       { type: 'function_call', call_id: 'k2', name: 'write', arguments: '{}' },
@@ -117,32 +121,32 @@ describe('requête Open Responses', () => {
       {
         type: 'function_call_output',
         call_id: 'k1',
-        output: [{ type: 'input_text', text: 'contenu' }],
+        output: [{ type: 'input_text', text: 'content' }],
       },
       {
         type: 'function_call_output',
         call_id: 'k2',
-        output: [{ type: 'input_text', text: 'écrit' }],
+        output: [{ type: 'input_text', text: 'written' }],
       },
       {
         type: 'function_call_output',
         call_id: 'k3',
         output: [{ type: 'input_text', text: USER_REPLY_ACK }],
       },
-      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Fais plutôt B' }] },
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Do B instead' }] },
     ])
   })
 
-  it('remplace une plage compactée par son résumé', () => {
+  it('replaces a compacted range with its summary', () => {
     const path: Item[] = [
-      item('u1', { kind: 'user_message', parts: [{ type: 'text', text: 'ancien' }] }),
-      item('a1', { kind: 'assistant_text', text: 'ancienne réponse', audience: 'user' }),
+      item('u1', { kind: 'user_message', parts: [{ type: 'text', text: 'old' }] }),
+      item('a1', { kind: 'assistant_text', text: 'old response', audience: 'user' }),
       item('k', {
         kind: 'event',
         name: 'compacted',
-        data: { from: 'u1', to: 'a1', summary: 'On a parlé de X.' },
+        data: { from: 'u1', to: 'a1', summary: 'We talked about X.' },
       }),
-      item('u2', { kind: 'user_message', parts: [{ type: 'text', text: 'nouveau' }] }),
+      item('u2', { kind: 'user_message', parts: [{ type: 'text', text: 'new' }] }),
     ]
     const body = toOpenResponsesRequest({ trigger: 'u2', path, tools: [] }, options)
     expect(body.input).toEqual([
@@ -150,21 +154,21 @@ describe('requête Open Responses', () => {
         type: 'message',
         role: 'developer',
         content: [
-          { type: 'input_text', text: "Résumé de la conversation jusqu'ici :\nOn a parlé de X." },
+          { type: 'input_text', text: 'Summary of the conversation so far:\nWe talked about X.' },
         ],
       },
-      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'nouveau' }] },
+      { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'new' }] },
     ])
   })
 
-  // La charge d'un réveil vient du modèle, parfois après une entrée non fiable : elle ne doit
-  // jamais arriver avec l'autorité des consignes.
-  it('rend un réveil comme une entrée, pas comme une consigne', () => {
+  // The payload of a wake-up comes from the model, sometimes after an untrusted input: it must
+  // never arrive with the authority of instructions.
+  it('returns a wake-up as an input, not as an instruction', () => {
     const path: Item[] = [
       item('w', {
         kind: 'event',
         name: 'wakeup_fired',
-        data: { id: 's1', at: '2026-10-30T10:01:00.000Z', payload: 'relever la boîte' },
+        data: { id: 's1', at: '2026-10-30T10:01:00.000Z', payload: 'check the inbox' },
       }),
     ]
     const body = toOpenResponsesRequest({ trigger: 'w', path, tools: [] }, options)
@@ -175,21 +179,21 @@ describe('requête Open Responses', () => {
         content: [
           {
             type: 'input_text',
-            text: 'Réveil programmé (identifiant : s1, prévu pour 2026-10-30T10:01:00.000Z) :\n"relever la boîte"',
+            text: 'Scheduled wake-up (identifier: s1, due at 2026-10-30T10:01:00.000Z):\n"check the inbox"',
           },
         ],
       },
     ])
   })
 
-  it('refuse un nom d’outil que la spécification interdit', () => {
+  it('refuses a tool name that the specification forbids', () => {
     expect(() =>
-      toOpenResponsesRequest({ trigger: 'u', path: [], tools: [spec('serveur.outil')] }, options),
+      toOpenResponsesRequest({ trigger: 'u', path: [], tools: [spec('server.tool')] }, options),
     ).toThrow(ToolNameError)
   })
 })
 
-describe('flux Open Responses', () => {
+describe('Open Responses stream', () => {
   const sse = (events: object[]) =>
     events
       .map((e) => `event: ${(e as { type: string }).type}\ndata: ${JSON.stringify(e)}\n\n`)
@@ -199,14 +203,14 @@ describe('flux Open Responses', () => {
     const s = createSseDecoder()
     const d = createOpenResponsesDecoder({ provider: 'wic-serving' })
     const out = []
-    // Morceaux de taille fixe : un message SSE peut être coupé n'importe où par le réseau.
+    // Fixed-size chunks: an SSE message can be cut anywhere by the network.
     for (let i = 0; i < raw.length; i += cut) {
       for (const m of s.push(raw.slice(i, i + cut))) out.push(...d.push(JSON.parse(m.data)))
     }
     return out
   }
 
-  it('rend les deltas puis le message final, raisonnement opaque compris', () => {
+  it('returns the deltas then the final message, opaque reasoning included', () => {
     const reasoning = {
       type: 'reasoning',
       id: 'rs1',
@@ -219,7 +223,7 @@ describe('flux Open Responses', () => {
       id: 'm1',
       role: 'assistant',
       status: 'completed',
-      content: [{ type: 'output_text', text: 'Je lis.', annotations: [] }],
+      content: [{ type: 'output_text', text: 'Reading.', annotations: [] }],
     }
     const call = {
       type: 'function_call',
@@ -258,7 +262,7 @@ describe('flux Open Responses', () => {
         item_id: 'm1',
         output_index: 1,
         content_index: 0,
-        delta: 'Je ',
+        delta: 'Read',
       },
       {
         type: 'response.output_text.delta',
@@ -266,7 +270,7 @@ describe('flux Open Responses', () => {
         item_id: 'm1',
         output_index: 1,
         content_index: 0,
-        delta: 'lis.',
+        delta: 'ing.',
       },
       { type: 'acme:trace', sequence_number: 7 },
       {
@@ -285,8 +289,8 @@ describe('flux Open Responses', () => {
     for (const cut of [1, 7, raw.length]) {
       expect(decodeAll(raw, cut)).toEqual([
         { type: 'reasoning', text: 'hmm' },
-        { type: 'text', text: 'Je ' },
-        { type: 'text', text: 'lis.' },
+        { type: 'text', text: 'Read' },
+        { type: 'text', text: 'ing.' },
         {
           type: 'done',
           message: {
@@ -296,7 +300,7 @@ describe('flux Open Responses', () => {
                 text: 'hmm',
                 opaque: { provider: 'wic-serving', data: { encrypted_content: 'E' } },
               },
-              { type: 'text', text: 'Je lis.' },
+              { type: 'text', text: 'Reading.' },
               { type: 'tool_call', callId: 'k1', tool: 'read', input: { path: 'a' } },
             ],
           },
@@ -305,7 +309,7 @@ describe('flux Open Responses', () => {
     }
   })
 
-  it('rend un échec du fournisseur', () => {
+  it('returns a provider failure', () => {
     const raw = sse([
       {
         type: 'response.failed',
@@ -316,7 +320,7 @@ describe('flux Open Responses', () => {
     expect(decodeAll(raw, 3)).toEqual([{ type: 'failed', code: 'server_error', message: 'boom' }])
   })
 
-  it('le décodeur SSE suit la norme : CRLF, commentaires, données sur plusieurs lignes', () => {
+  it('the SSE decoder follows the standard: CRLF, comments, data over several lines', () => {
     const s = createSseDecoder()
     expect(s.push(': ping\r\nevent: a\r\ndata: 1\r\ndata: 2\r')).toEqual([])
     expect(s.push('\n\r\n')).toEqual([{ event: 'a', data: '1\n2' }])

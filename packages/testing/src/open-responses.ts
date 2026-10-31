@@ -1,9 +1,9 @@
-// Faux service Open Responses pour les tests : les réponses d'un fournisseur sous forme de flux
-// d'événements, comme `model-compat` les lit.
+// Fake Open Responses service for the tests: the responses of a provider as event streams, the
+// way `model-compat` reads them.
 
 type Output = Record<string, unknown>
 
-/** Un flux d'événements Open Responses pour une liste d'éléments de sortie. */
+/** An Open Responses event stream for a list of output items. */
 export function openResponsesStream(output: Output[]): Response {
   let n = 0
   const events: object[] = [{ type: 'response.created', sequence_number: n++, response: {} }]
@@ -16,7 +16,7 @@ export function openResponsesStream(output: Output[]): Response {
     })
     if (item.type === 'message') {
       const text = (item.content as { text: string }[])[0]?.text ?? ''
-      // Deux deltas : un client doit recoller les morceaux d'un même texte.
+      // Two deltas: a client must join the pieces of the same text back together.
       const half = Math.ceil(text.length / 2)
       for (const delta of [text.slice(0, half), text.slice(half)]) {
         events.push({
@@ -61,7 +61,7 @@ export const openResponsesMessage = (text: string): Output => ({
 })
 
 /**
- * Un flux de texte sans fin, un delta toutes les 5 ms, qui s'arrête quand la requête est annulée.
+ * An endless text stream, one delta every 5 ms, which stops when the request is cancelled.
  */
 export function endlessOpenResponsesStream(signal: AbortSignal | null | undefined): Response {
   let n = 0
@@ -87,12 +87,12 @@ export function endlessOpenResponsesStream(signal: AbortSignal | null | undefine
           item_id: 'msg',
           output_index: 0,
           content_index: 0,
-          delta: 'encore ',
+          delta: 'more ',
         })
       }, 5)
       signal?.addEventListener('abort', () => {
         clearInterval(timer)
-        controller.error(new DOMException('annulé', 'AbortError'))
+        controller.error(new DOMException('cancelled', 'AbortError'))
       })
     },
     cancel() {

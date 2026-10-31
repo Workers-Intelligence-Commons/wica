@@ -1,7 +1,7 @@
-// Conversion entre le journal et la spécification Open Responses, version 2026-04-24
-// (https://www.openresponses.org/specification) : chemin actif vers corps de requête, événements
-// du flux vers `Delta` et `AssistantMessage`. Aucun état n'est gardé côté fournisseur : chaque
-// requête porte `store: false` et tout le chemin, jamais `previous_response_id`.
+// Conversion between the journal and the Open Responses specification, version 2026-04-24
+// (https://www.openresponses.org/specification): active path to request body, stream events to
+// `Delta` and `AssistantMessage`. No state is kept on the provider side: each request carries
+// `store: false` and the whole path, never `previous_response_id`.
 
 import type {
   AssistantMessage,
@@ -56,8 +56,8 @@ export type OpenResponsesRequest = {
 export type RequestOptions = {
   model: string
   /**
-   * Nom du fournisseur inscrit dans les données opaques du raisonnement : elles ne sont renvoyées
-   * qu'au même fournisseur (règle du journal).
+   * Name of the provider written into the opaque reasoning data: it is sent back only to the same
+   * provider (journal rule).
    */
   provider: string
   reasoning?: OpenResponsesRequest['reasoning']
@@ -65,13 +65,13 @@ export type RequestOptions = {
   temperature?: number
 }
 
-/** Contenu opaque d'un élément de raisonnement, gardé tel quel dans le journal. */
+/** Opaque content of a reasoning item, kept as it is in the journal. */
 export type ReasoningOpaque = {
   encrypted_content?: string
   summary?: { type: 'summary_text'; text: string }[]
 }
 
-/** Un nom d'outil que la spécification refuse. */
+/** A tool name that the specification refuses. */
 export class ToolNameError extends Error {
   override name = 'ToolNameError'
 }
@@ -90,7 +90,7 @@ const content = (parts: Part[]): InputContent[] =>
 function tool(spec: ToolSpec): FunctionTool {
   if (!TOOL_NAME.test(spec.name)) {
     throw new ToolNameError(
-      `Nom d'outil refusé par Open Responses : « ${spec.name} » (lettres, chiffres, _ et -, 64 au plus).`,
+      `Tool name refused by Open Responses: "${spec.name}" (letters, digits, _ and -, 64 at most).`,
     )
   }
   return {
@@ -142,7 +142,7 @@ function inputItem(entry: TranscriptEntry, provider: string): InputItem | undefi
   }
 }
 
-/** Chemin actif vers le corps d'une requête Open Responses. */
+/** Active path to the body of an Open Responses request. */
 export function toOpenResponsesRequest(
   request: ModelRequest,
   options: RequestOptions,
@@ -188,8 +188,8 @@ function parseArguments(raw: string | undefined): unknown {
   try {
     return JSON.parse(raw)
   } catch {
-    // Des arguments qui ne sont pas du JSON restent en texte : la validation de l'outil rend
-    // alors un résultat d'erreur au modèle.
+    // Arguments that are not JSON stay as text: the tool validation then returns an error result
+    // to the model.
     return raw
   }
 }
@@ -229,12 +229,12 @@ function toPart(item: OutputItem, provider: string): AssistantPart | undefined {
         input: parseArguments(item.arguments),
       }
     default:
-      // Éléments propres à un fournisseur (préfixés par son nom) : ignorés, comme le veut la spec.
+      // Items specific to a provider (prefixed by its name): ignored, as the spec requires.
       return undefined
   }
 }
 
-/** Décodeur des événements du flux d'une réponse ; chaque événement rend zéro ou plusieurs morceaux. */
+/** Decoder of the stream events of a response; each event returns zero or more chunks. */
 export function createOpenResponsesDecoder(options: { provider: string }) {
   const items = new Map<number, OutputItem>()
   let finished = false
@@ -286,7 +286,7 @@ export function createOpenResponsesDecoder(options: { provider: string }) {
             {
               type: 'done',
               message: message(e.response?.output),
-              incomplete: e.response?.incomplete_details?.reason ?? 'inconnue',
+              incomplete: e.response?.incomplete_details?.reason ?? 'unknown',
             },
           ]
         case 'response.failed':
@@ -295,7 +295,7 @@ export function createOpenResponsesDecoder(options: { provider: string }) {
             {
               type: 'failed',
               code: e.response?.error?.code ?? null,
-              message: e.response?.error?.message ?? 'La réponse a échoué.',
+              message: e.response?.error?.message ?? 'The response failed.',
             },
           ]
         case 'error':
@@ -304,7 +304,7 @@ export function createOpenResponsesDecoder(options: { provider: string }) {
             {
               type: 'failed',
               code: e.error?.code ?? null,
-              message: e.error?.message ?? 'Erreur du fournisseur.',
+              message: e.error?.message ?? 'Provider error.',
             },
           ]
         default:

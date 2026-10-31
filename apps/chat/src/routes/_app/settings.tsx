@@ -1,5 +1,5 @@
-// Réglages du compte : serveurs distants (création, jeton montré une fois, révocation) et
-// jetons de modèle (clé d'API, ou connexion à un abonnement avec son avertissement unique).
+// Account settings: remote servers (creation, token shown once, revocation) and model tokens
+// (API key, or login to a subscription with its one-time warning).
 
 import { eq, useLiveQuery } from '@tanstack/react-db'
 import { createFileRoute } from '@tanstack/react-router'

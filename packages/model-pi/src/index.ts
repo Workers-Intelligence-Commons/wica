@@ -1,6 +1,6 @@
-// Adaptateur de modèle pour les fournisseurs hébergés, au-dessus de la bibliothèque pi-ai et
-// d'elle seule. Le rendu du chemin vient
-// de `codecs` ; ce paquet le traduit en messages de pi-ai, et le flux de pi-ai en `Delta`.
+// Model adapter for hosted providers, on top of the pi-ai library and of it alone. The path
+// rendering comes from `codecs`; this package translates it into pi-ai messages, and the pi-ai
+// stream into `Delta`s.
 
 import type {
   Api,
@@ -23,31 +23,30 @@ import type { AssistantMessage, AssistantPart, ModelRequest, Part, ToolSpec } fr
 import type { ModelAdapter, ModelChunk } from '@wica/runtime'
 
 export type PiModelOptions = {
-  /** Collection de modèles de pi-ai, créée et authentifiée par l'hôte. */
+  /** Collection of pi-ai models, created and authenticated by the host. */
   models: Models
-  /** Fournisseur et modèle au sens de pi-ai, par exemple `anthropic` et `claude-sonnet-5-5`. */
+  /** Provider and model in the pi-ai sense, for example `anthropic` and `claude-sonnet-5-5`. */
   provider: string
   model: string
   reasoning?: ThinkingLevel
-  /** Options de requête de pi-ai (clé, en-têtes, réessais, durée) ; ni signal ni raisonnement. */
+  /** pi-ai request options (key, headers, retries, duration); neither signal nor reasoning. */
   request?: Omit<ModelsSimpleStreamOptions, 'signal' | 'reasoning'>
   /**
-   * Appelé avant la première requête de cet adaptateur qui passe par un abonnement (connexion
-   * OAuth), pour que l'hôte avertisse la personne ; l'hôte garde la trace d'un avertissement déjà
-   * donné.
+   * Called before the first request of this adapter that goes through a subscription (OAuth
+   * login), so that the host warns the person; the host keeps track of a warning already given.
    */
   onFirstSubscriptionUse?: (provider: string) => void | Promise<void>
 }
 
-/** Échec du fournisseur, rendu par pi-ai. */
+/** Failure of the provider, returned by pi-ai. */
 export class ModelError extends Error {
   override name = 'ModelError'
 }
 
 /**
- * Données opaques d'une réponse : un bloc de réflexion, ou les signatures que pi-ai attache aux
- * textes (dans leur ordre) et aux appels (par identifiant). Elles ne valent que pour le modèle qui
- * les a produites.
+ * Opaque data of a response: a thinking block, or the signatures that pi-ai attaches to texts (in
+ * their order) and to calls (by identifier). They are valid only for the model that produced
+ * them.
  */
 export type PiOpaque =
   | { thinking: ThinkingContent }
@@ -57,12 +56,12 @@ type ToolCallExtra = Omit<ToolCall, 'type' | 'id' | 'name' | 'arguments' | 'argu
 
 type Target = Pick<Model<Api>, 'api' | 'provider' | 'id'>
 
-/** Fournisseur inscrit dans les données opaques : l'API, le fournisseur et le modèle exacts. */
+/** Provider written into the opaque data: the exact API, provider and model. */
 export const opaqueProvider = (model: Target) => `pi:${model.api}:${model.provider}:${model.id}`
 
 const DATA_URI = /^data:([^;,]+);base64,(.*)$/s
 
-/** Une image en `data:` part en image ; un autre fichier, que pi-ai ne sait pas lire, en mention. */
+/** An image in `data:` leaves as an image; another file, which pi-ai cannot read, as a mention. */
 function content(parts: Part[]): (TextContent | ImageContent)[] {
   return parts.map((p) => {
     if (p.type === 'text') return { type: 'text', text: p.text }
@@ -70,14 +69,14 @@ function content(parts: Part[]): (TextContent | ImageContent)[] {
     if (data && p.mediaType.startsWith('image/')) {
       return { type: 'image', data: data[2] ?? '', mimeType: data[1] ?? p.mediaType }
     }
-    return { type: 'text', text: `[Fichier ${p.mediaType} : ${p.uri}]` }
+    return { type: 'text', text: `[File ${p.mediaType}: ${p.uri}]` }
   })
 }
 
 const tool = (spec: ToolSpec): Tool => ({
   name: spec.name,
   description: spec.description,
-  // TypeBox décrit ses schémas en JSON Schema ordinaire, que pi-ai envoie tel quel.
+  // TypeBox describes its schemas in ordinary JSON Schema, which pi-ai sends as it is.
   parameters: spec.inputSchema as TSchema,
 })
 
@@ -95,7 +94,7 @@ type AssistantEntry = Extract<
   { type: 'assistant_text' | 'reasoning' | 'tool_call' }
 >
 
-/** Une suite d'entrées du modèle vers un message de pi-ai, avec les seules données opaques du modèle. */
+/** A sequence of model entries to a pi-ai message, with only the opaque data of the model. */
 function assistantMessage(entries: AssistantEntry[], model: Target): PiAssistantMessage {
   const own = opaqueProvider(model)
   const blocks: PiAssistantMessage['content'] = []
@@ -142,10 +141,10 @@ function assistantMessage(entries: AssistantEntry[], model: Target): PiAssistant
 }
 
 /**
- * Chemin actif vers le contexte de pi-ai. Les consignes du Harness placées dans la conversation
- * (résumé, reprise de branche, demande de résumé) partent en messages de l'utilisateur : tous les
- * fournisseurs n'acceptent pas une consigne système au milieu, et pi-ai les replierait sinon dans
- * le prompt système, loin de leur place.
+ * Active path to the pi-ai context. The Harness instructions placed in the conversation (summary,
+ * branch resume, summary request) leave as user messages: not every provider accepts a system
+ * instruction in the middle, and pi-ai would otherwise fold them into the system prompt, far
+ * from their place.
  */
 export function toPiContext(request: ModelRequest, model: Target): Context {
   const messages: Message[] = []
@@ -190,7 +189,7 @@ export function toPiContext(request: ModelRequest, model: Target): Context {
   }
 }
 
-/** Message final de pi-ai vers celui du Harness ; les signatures vont dans une partie de raisonnement. */
+/** Final pi-ai message to the Harness one; the signatures go into a reasoning part. */
 export function fromPiMessage(message: PiAssistantMessage, model: Target): AssistantMessage {
   const provider = opaqueProvider(model)
   const parts: AssistantPart[] = []
@@ -208,8 +207,8 @@ export function fromPiMessage(message: PiAssistantMessage, model: Target): Assis
       })
     } else {
       const { type: _type, id, name, arguments: input, argumentsError, ...extra } = block
-      // Des arguments qui ne sont pas un objet JSON restent en texte : la validation de l'outil
-      // rend alors un résultat d'erreur au modèle.
+      // Arguments that are not a JSON object stay as text: the tool validation then returns an
+      // error result to the model.
       parts.push({ type: 'tool_call', callId: id, tool: name, input: argumentsError ?? input })
       if (Object.keys(extra).length > 0) toolCalls[id] = extra
     }
@@ -229,7 +228,7 @@ export function piModel(options: PiModelOptions): ModelAdapter {
   const resolve = async () => {
     const model = options.models.getModel(options.provider, options.model)
     if (!model) {
-      throw new ModelError(`Modèle inconnu de pi-ai : ${options.provider}/${options.model}.`)
+      throw new ModelError(`Model unknown to pi-ai: ${options.provider}/${options.model}.`)
     }
     if (options.onFirstSubscriptionUse && !warned) {
       const auth = await options.models.checkAuth(options.provider)
@@ -263,13 +262,11 @@ export function piModel(options: PiModelOptions): ModelAdapter {
           case 'error':
             throw new ModelError(
               event.error.errorMessage ??
-                (event.reason === 'aborted'
-                  ? 'Requête au modèle annulée.'
-                  : 'Erreur du fournisseur.'),
+                (event.reason === 'aborted' ? 'Model request cancelled.' : 'Provider error.'),
             )
         }
       }
-      throw new ModelError('Le flux du modèle s’est arrêté sans réponse finale.')
+      throw new ModelError('The model stream stopped without a final response.')
     },
   }
 }

@@ -17,34 +17,34 @@ const call = (tool: string): Extract<Item, { kind: 'tool_call' }> => ({
 })
 
 describe('renderAnswer', () => {
-  // Le modèle lit la réponse comme la parole de la personne : elle doit être dans ses mots.
-  it('rend chaque sorte de réponse dans les mots de la personne', () => {
+  // The model reads the answer as the person's speech: it must be in their words.
+  it('renders each kind of answer in the words of the person', () => {
     const ask = call('ask_user')
     const text = (value: unknown) => renderAnswer(ask, value)[0]
     expect(text({ kind: 'choice', label: 'Option B' })).toEqual({ type: 'text', text: 'Option B' })
     expect(text({ kind: 'multiple', labels: ['A', 'C'] })).toEqual({ type: 'text', text: 'A, C' })
-    expect(text({ kind: 'text', text: 'Fais plutôt ça' })).toEqual({
+    expect(text({ kind: 'text', text: 'Do that instead' })).toEqual({
       type: 'text',
-      text: 'Fais plutôt ça',
+      text: 'Do that instead',
     })
-    expect(text({ kind: 'confirm', yes: false })).toEqual({ type: 'text', text: 'Non.' })
-    expect(text({ kind: 'form', values: { nom: 'Ada', urgent: true } })).toEqual({
+    expect(text({ kind: 'confirm', yes: false })).toEqual({ type: 'text', text: 'No.' })
+    expect(text({ kind: 'form', values: { name: 'Ada', urgent: true } })).toEqual({
       type: 'text',
-      text: 'nom : Ada\nurgent : oui',
+      text: 'name: Ada\nurgent: yes',
     })
   })
 
-  it('rend la réponse à une demande d’information MCP dans les mots de la personne', () => {
+  it('renders the answer to an MCP information request in the words of the person', () => {
     const elicit = call('elicit')
     expect(
-      renderAnswer(elicit, { action: 'accept', content: { ville: 'Lyon', tags: ['a', 'b'] } }),
-    ).toEqual([{ type: 'text', text: 'ville : Lyon\ntags : a, b' }])
+      renderAnswer(elicit, { action: 'accept', content: { city: 'Lyon', tags: ['a', 'b'] } }),
+    ).toEqual([{ type: 'text', text: 'city: Lyon\ntags: a, b' }])
     expect(renderAnswer(elicit, { action: 'decline' })).toEqual([
-      { type: 'text', text: 'Je refuse de répondre.' },
+      { type: 'text', text: 'I refuse to answer.' },
     ])
   })
 
-  it('garde le texte brut ou le JSON pour les autres outils', () => {
+  it('keeps the raw text or the JSON for the other tools', () => {
     expect(renderAnswer(call('pick_file'), 'a.txt')).toEqual([{ type: 'text', text: 'a.txt' }])
     expect(renderAnswer(undefined, { x: 1 })).toEqual([{ type: 'text', text: '{"x":1}' }])
   })

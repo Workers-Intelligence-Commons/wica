@@ -1,5 +1,5 @@
-// Lancement de serveurs MCP locaux (stdio), propre à Node : le reste du paquet n'utilise que des
-// API web standard.
+// Launching local MCP servers (stdio), specific to Node: the rest of the package uses only
+// standard web APIs.
 
 import type { Transport } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
@@ -11,7 +11,7 @@ export type StdioServer = {
   env?: Record<string, string>
 }
 
-/** Fabrique de transport pour `McpServerConfig.transport` : un nouveau processus par connexion. */
+/** Transport factory for `McpServerConfig.transport`: a new process per connection. */
 export const stdioServer =
   (server: StdioServer): (() => Transport) =>
   () =>

@@ -1,8 +1,7 @@
-// Transport à stockage intermédiaire : l'hôte dépose
-// les commandes dans une `CommandInbox`, que le serveur suit par une connexion sortante ; il
-// traverse donc un routeur sans rien d'entrant. Le serveur écrit ses éléments par le `Store` de
-// l'hôte, et les clients les lisent par la synchro de l'hôte : ce transport ne porte que les
-// commandes et leurs accusés.
+// Transport with intermediate storage: the host places the commands in a `CommandInbox`, which the
+// server follows through an outgoing connection; it therefore crosses a router with nothing
+// incoming. The server writes its items through the host's `Store`, and the clients read them
+// through the host's sync: this transport carries only the commands and their acknowledgements.
 
 import {
   type Envelope,
@@ -12,40 +11,40 @@ import {
   type ServerTransport,
 } from '@wica/protocol'
 
-/** Une commande déposée, avec sa position dans la boîte. */
+/** A placed command, with its position in the inbox. */
 export type InboxEntry = { cursor: string; envelope: Envelope }
 
 export type InboxAck = { ok: true } | { ok: false; error: string }
 
-/** Boîte de commandes d'un serveur, fournie par l'hôte. */
+/** Command inbox of a server, provided by the host. */
 export interface CommandInbox {
   /**
-   * Commandes après `cursor`, puis en direct, tant que la connexion tient ; sans curseur, toutes
-   * celles qui n'ont pas d'accusé. Le flux finit ou échoue quand la connexion tombe.
+   * Commands after `cursor`, then live, as long as the connection holds; without a cursor, all
+   * those that have no acknowledgement. The stream ends or fails when the connection drops.
    */
   follow(cursor: string | null, signal: AbortSignal): AsyncIterable<InboxEntry>
   ack(commandId: string, result: InboxAck): Promise<void>
-  /** Battement de cœur du serveur, qui permet au client d'afficher « serveur hors ligne ». */
+  /** Server heartbeat, which lets the client show "server offline". */
   heartbeat(): Promise<void>
 }
 
 export type InboxOptions = {
-  /** Jeton du serveur, présenté dans `hello`. */
+  /** Server token, presented in `hello`. */
   token?: string
-  /** Première attente avant une reconnexion ; elle double à chaque échec. 200 ms par défaut. */
+  /** First wait before a reconnection; it doubles at each failure. 200 ms by default. */
   baseDelayMs?: number
-  /** Attente maximale entre deux tentatives. 30 s par défaut. */
+  /** Maximum wait between two attempts. 30 s by default. */
   maxDelayMs?: number
-  /** Intervalle du battement de cœur. 15 s par défaut. */
+  /** Heartbeat interval. 15 s by default. */
   heartbeatMs?: number
-  /** Refus de la connexion par le serveur (authentification), qui sinon ne traiterait rien. */
+  /** Refusal of the connection by the server (authentication), which otherwise would process nothing. */
   onRefused?: (message: string) => void
 }
 
 /**
- * La boîte vue comme un transport de serveur : `harness.serve(inboxTransport(boîte))`. Après
- * une coupure, la boîte est relue depuis le dernier curseur reçu ; une commande rejouée malgré
- * tout est dédoublonnée par le serveur.
+ * The inbox seen as a server transport: `harness.serve(inboxTransport(inbox))`. After a
+ * disconnection, the inbox is read again from the last cursor received; a command replayed
+ * anyway is deduplicated by the server.
  */
 export function inboxTransport(inbox: CommandInbox, options: InboxOptions = {}): ServerTransport {
   const base = options.baseDelayMs ?? 200
@@ -61,7 +60,7 @@ export function inboxTransport(inbox: CommandInbox, options: InboxOptions = {}):
       })
     })
 
-  /** Un accusé perdu laisserait la commande en attente chez l'hôte : il est réessayé. */
+  /** A lost acknowledgement would leave the command pending at the host: it is retried. */
   const ack = async (commandId: string, result: InboxAck) => {
     for (let failures = 0; !stop.signal.aborted; failures++) {
       try {
@@ -93,7 +92,7 @@ export function inboxTransport(inbox: CommandInbox, options: InboxOptions = {}):
           yield entry.envelope
         }
       } catch {
-        // Connexion perdue : on reprend au curseur après une attente croissante.
+        // Connection lost: resume at the cursor after a growing wait.
       }
       if (!stop.signal.aborted) await sleep(Math.min(base * 2 ** failures++, max))
     }
@@ -115,11 +114,11 @@ export function inboxTransport(inbox: CommandInbox, options: InboxOptions = {}):
   }
 }
 
-/** Boîte en mémoire pour les tests : `deposit` joue l'hôte, `cut` coupe la connexion. */
+/** In-memory inbox for the tests: `deposit` plays the host, `cut` cuts the connection. */
 export class MemoryCommandInbox implements CommandInbox {
   readonly #entries: InboxEntry[] = []
   readonly acks = new Map<string, InboxAck>()
-  /** Dernier battement de cœur reçu, en millisecondes. */
+  /** Last heartbeat received, in milliseconds. */
   lastSeen = 0
   #online = true
   #wake: (() => void)[] = []
@@ -130,7 +129,7 @@ export class MemoryCommandInbox implements CommandInbox {
     this.#notify()
   }
 
-  /** Coupe les connexions en cours ; hors ligne, toute nouvelle connexion échoue. */
+  /** Cuts the current connections; while offline, every new connection fails. */
   cut(options: { offline?: boolean } = {}) {
     this.#online = !options.offline
     this.#generation += 1
@@ -146,12 +145,12 @@ export class MemoryCommandInbox implements CommandInbox {
   }
 
   async *follow(cursor: string | null, signal: AbortSignal): AsyncIterable<InboxEntry> {
-    if (!this.#online) throw new TypeError('boîte de commandes injoignable')
+    if (!this.#online) throw new TypeError('command inbox unreachable')
     const generation = this.#generation
     let next = cursor === null ? 0 : Number(cursor)
     for (;;) {
       if (signal.aborted) return
-      if (generation !== this.#generation) throw new TypeError('connexion perdue')
+      if (generation !== this.#generation) throw new TypeError('connection lost')
       const entry = this.#entries[next]
       if (entry) {
         next += 1
@@ -167,12 +166,12 @@ export class MemoryCommandInbox implements CommandInbox {
   }
 
   async ack(commandId: string, result: InboxAck) {
-    if (!this.#online) throw new TypeError('boîte de commandes injoignable')
+    if (!this.#online) throw new TypeError('command inbox unreachable')
     this.acks.set(commandId, result)
   }
 
   async heartbeat() {
-    if (!this.#online) throw new TypeError('boîte de commandes injoignable')
+    if (!this.#online) throw new TypeError('command inbox unreachable')
     this.lastSeen = Date.now()
   }
 }

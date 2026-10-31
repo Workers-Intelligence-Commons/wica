@@ -1,6 +1,6 @@
-// Client du protocole : miroir local du journal, envoi des
-// commandes et vue dérivée pour l'écran. Le miroir rattrape le serveur, il ne fait jamais foi.
-// Ce paquet ne dépend d'aucune bibliothèque de synchronisation, de stockage ou de rendu.
+// Protocol client: local mirror of the journal, sending of commands, and view derived for the
+// screen. The mirror catches up with the server, it is never the source of truth. This package
+// depends on no synchronization, storage or rendering library.
 
 import {
   APPROVAL_TOOL,
@@ -47,21 +47,21 @@ export type ViewEntry =
 export type ConversationView = {
   head: string | null
   entries: ViewEntry[]
-  /** Appels du canal utilisateur qui attendent une réponse de la personne. */
+  /** Calls of the user channel that wait for an answer from the person. */
   waiting: Extract<Item, { kind: 'tool_call' }>[]
   /**
-   * Appels d'outils confiés à ce client par le serveur, une fois autorisés, qui attendent leur
-   * résultat (`answer` avec un `ClientToolResult`).
+   * Tool calls delegated to this client by the server, once allowed, that wait for their result
+   * (`answer` with a `ClientToolResult`).
    */
   clientCalls: Extract<Item, { kind: 'tool_call' }>[]
   /**
-   * Le journal est au repos : aucun appel n'attend son résultat et rien n'attend de réponse du
-   * modèle. Avec `running` faux, le serveur ne doit plus rien à cette conversation.
+   * The journal is at rest: no call waits for its result and nothing waits for a response from the
+   * model. With `running` false, the server owes nothing more to this conversation.
    */
   settled: boolean
-  /** Dernière erreur signalée par le serveur, par exemple un échec du modèle. */
+  /** Last error reported by the server, for example a model failure. */
   error?: string
-  /** Vrai pendant qu'un tour tourne sur le serveur. */
+  /** True while a turn runs on the server. */
   running?: boolean
 }
 
@@ -72,18 +72,18 @@ type Mirror = {
   live: Map<string, string>
   progress: Map<string, string>
   listeners: Set<() => void>
-  /** Dernière erreur signalée par le serveur pour cette conversation. */
+  /** Last error reported by the server for this conversation. */
   error?: string
   running: boolean
 }
 
 export type ClientOptions = {
-  /** Provenance de la personne qui utilise ce client, pour calculer l'identifiant de ses messages. */
+  /** Provenance of the person who uses this client, to compute the identifier of their messages. */
   from?: Pick<Origin, 'channel' | 'author'>
   token?: string
 }
 
-/** Vue pour l'écran, dérivée du miroir sans état propre. */
+/** View for the screen, derived from the mirror without state of its own. */
 export function deriveView(
   items: Iterable<Item>,
   head: string | null,
@@ -182,12 +182,12 @@ export function createClient(transport: ClientTransport, options: ClientOptions 
       refused = reject
     })
   let welcome = expectWelcome()
-  // Un refus sans attente déclarée ne doit pas devenir une promesse rejetée orpheline.
+  // A refusal with no declared waiter must not become an orphan rejected promise.
   welcome.catch(() => {})
-  /** Commandes sans accusé, renvoyées telles quelles après une reconnexion. */
+  /** Commands without acknowledgement, sent again as they are after a reconnection. */
   const unacked = new Map<string, Envelope>()
   const subscribed = new Set<string>()
-  /** Abonnements qui attendent leur première trame `status`, envoyée après l'historique. */
+  /** Subscriptions waiting for their first `status` frame, sent after the history. */
   const syncing = new Map<string, () => void>()
   let hello: ClientFrame | null = null
 
@@ -220,7 +220,7 @@ export function createClient(transport: ClientTransport, options: ClientOptions 
         m.salt = frame.salt
         for (const item of frame.items) {
           m.items.set(item.id, item)
-          // Le texte enregistré fait foi ; les deltas suivants s'y ajoutent.
+          // The recorded text is the source of truth; the following deltas are added to it.
           m.live.delete(item.id)
         }
         return notify(m)
@@ -254,7 +254,7 @@ export function createClient(transport: ClientTransport, options: ClientOptions 
         return
       }
       case 'error': {
-        // Sans conversation : refus de la connexion elle-même (authentification).
+        // Without a conversation: refusal of the connection itself (authentication).
         if (!frame.conversationId) return refused(new Error(frame.message))
         const m = mirror(frame.conversationId)
         m.error = frame.message
@@ -277,8 +277,8 @@ export function createClient(transport: ClientTransport, options: ClientOptions 
     transport.send({ kind: 'subscribe', conversationId, fromSeq: fromSeq(conversationId) })
 
   /**
-   * Curseur de reprise : un élément réglé après coup garde son `seq`, donc la lecture reprend
-   * avant le plus ancien élément encore en flux.
+   * Resume cursor: an item settled afterwards keeps its `seq`, so reading resumes before the
+   * oldest item still streaming.
    */
   function fromSeq(conversationId: string): number {
     const items = [...mirror(conversationId).items.values()]
@@ -287,14 +287,14 @@ export function createClient(transport: ClientTransport, options: ClientOptions 
     return items.reduce((max, i) => Math.max(max, i.seq), 0)
   }
 
-  // Après une reconnexion : nouvelle session, abonnements depuis le curseur, commandes rejouées
-  // avec leur identifiant, que le serveur n'exécute qu'une fois.
+  // After a reconnection: new session, subscriptions from the cursor, commands replayed with
+  // their identifier, which the server runs only once.
   transport.onReopen?.(() => {
     if (!hello) return
     welcome = expectWelcome()
     welcome.catch(() => {})
     void (async () => {
-      // La session connue est reprise ; perdue côté serveur, il en ouvre une autre sans bruit.
+      // The known session is resumed; if it is lost on the server side, it opens another one silently.
       await transport.send({
         ...(hello as Extract<ClientFrame, { kind: 'hello' }>),
         ...(sessionId ? { sessionId } : {}),
@@ -341,7 +341,7 @@ export function createClient(transport: ClientTransport, options: ClientOptions 
 
     fromSeq,
 
-    /** S'abonne et rend la main une fois l'historique reçu (le serveur envoie ensuite `status`). */
+    /** Subscribes and returns once the history is received (the server then sends `status`). */
     async subscribe(conversationId: string) {
       await welcome
       subscribed.add(conversationId)
@@ -365,7 +365,7 @@ export function createClient(transport: ClientTransport, options: ClientOptions 
       return () => m.listeners.delete(listener)
     },
 
-    /** Envoie un message et rend son identifiant, calculé comme le fera le serveur. */
+    /** Sends a message and returns its identifier, computed the way the server will. */
     async send(
       conversationId: string,
       parts: Part[] | string,

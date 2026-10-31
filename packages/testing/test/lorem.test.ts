@@ -12,8 +12,8 @@ const journal = async (harness: Harness, conversationId: string) =>
 const texts = (items: Item[]) =>
   items.flatMap((i) => (i.kind === 'assistant_text' ? [{ text: i.text, status: i.status }] : []))
 
-describe('faux modèles lorem', () => {
-  it('écrit en flux une réponse de texte que le journal garde entière', async () => {
+describe('fake lorem models', () => {
+  it('streams a text response that the journal keeps whole', async () => {
     const harness = createHarness({ model: loremModel('lorem', { delayMs: 0 }) })
     let streamed = ''
     for await (const event of harness.run('Hello', { conversationId: 'l1' })) {
@@ -25,10 +25,10 @@ describe('faux modèles lorem', () => {
     expect(streamed).toBe(reply?.text)
   })
 
-  it('appelle un outil de travail à chaque tour, jamais une question, puis répond', async () => {
+  it('calls a work tool at each turn, never a question, then answers', async () => {
     const harness = createHarness({
       model: loremModel('lorem-tools', { delayMs: 0 }),
-      tools: [askUser, memoryFiles({ 'Lorem ipsum dolor sit amet.': 'contenu' })],
+      tools: [askUser, memoryFiles({ 'Lorem ipsum dolor sit amet.': 'content' })],
       authorize: allowAll,
     })
     for await (const _ of harness.run('Hello', { conversationId: 'l2' })) void _
@@ -49,7 +49,7 @@ describe('faux modèles lorem', () => {
     expect(result?.kind === 'tool_result' && result.isError).toBeFalsy()
   })
 
-  it('s’arrête en cours de flux quand on interrompt la réponse', async () => {
+  it('stops in the middle of the stream when the response is interrupted', async () => {
     const harness = createHarness({ model: loremModel('lorem', { delayMs: 20 }) })
     for await (const event of harness.run('Hello', { conversationId: 'l3' })) {
       if (event.type === 'delta') await harness.interrupt('l3')

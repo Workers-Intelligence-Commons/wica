@@ -1,12 +1,11 @@
-// Identifiants déterministes des éléments.
-// Le client et le serveur exécutent ce même code : un écart d'un seul octet dans la
-// sérialisation donnerait deux identifiants différents pour le même message.
+// Deterministic item identifiers. The client and the server run this same code: a difference of
+// a single byte in the serialization would give two different identifiers for the same message.
 
 import type { Origin, Part } from './journal.ts'
 
 /**
- * Sérialisation canonique : clés d'objet triées par unités de code UTF-16, nombres et
- * chaînes écrits comme `JSON.stringify`, propriétés `undefined` omises (règles de la RFC 8785).
+ * Canonical serialization: object keys sorted by UTF-16 code units, numbers and strings written
+ * like `JSON.stringify`, `undefined` properties omitted (RFC 8785 rules).
  */
 export function canonicalJson(value: unknown): string {
   if (value === null) return 'null'
@@ -16,7 +15,7 @@ export function canonicalJson(value: unknown): string {
     case 'string':
       return JSON.stringify(value)
     case 'number':
-      if (!Number.isFinite(value)) throw new TypeError('canonicalJson : nombre non fini')
+      if (!Number.isFinite(value)) throw new TypeError('canonicalJson: non-finite number')
       return JSON.stringify(value)
     case 'object': {
       if (Array.isArray(value)) {
@@ -28,16 +27,16 @@ export function canonicalJson(value: unknown): string {
       return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(',')}}`
     }
     default:
-      throw new TypeError(`canonicalJson : type non sérialisable (${typeof value})`)
+      throw new TypeError(`canonicalJson: non-serializable type (${typeof value})`)
   }
 }
 
-// `core` n'a ni dépendance ni API de plateforme : l'encodage UTF-8 et SHA-256 sont écrits ici.
+// `core` has no dependency and no platform API: the UTF-8 encoding and SHA-256 are written here.
 function utf8(text: string): Uint8Array {
   const out: number[] = []
   for (const char of text) {
     const c = char.codePointAt(0) as number
-    if (c >= 0xd800 && c <= 0xdfff) throw new TypeError('utf8 : demi-paire UTF-16 isolée')
+    if (c >= 0xd800 && c <= 0xdfff) throw new TypeError('utf8: lone UTF-16 surrogate')
     if (c < 0x80) out.push(c)
     else if (c < 0x800) out.push(0xc0 | (c >> 6), 0x80 | (c & 63))
     else if (c < 0x10000) out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63))
@@ -125,7 +124,7 @@ export function sha256(data: Uint8Array): Uint8Array {
 const hex = (bytes: Uint8Array) =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
 
-/** UUID v8 (RFC 9562) tiré des 16 premiers octets du SHA-256 de la sérialisation canonique. */
+/** UUID v8 (RFC 9562) taken from the first 16 bytes of the SHA-256 of the canonical serialization. */
 export function deterministicUuid(value: unknown): string {
   const bytes = sha256(utf8(canonicalJson(value))).slice(0, 16)
   bytes[6] = ((bytes[6] as number) & 0x0f) | 0x80
@@ -142,7 +141,7 @@ export type UserMessageIdInput = {
   parts: Part[]
 }
 
-/** Identifiant d'un `user_message`, calculé à l'identique par le client et le serveur. */
+/** Identifier of a `user_message`, computed identically by the client and the server. */
 export function userMessageId(input: UserMessageIdInput): string {
   return deterministicUuid([
     'wica/user_message/1',
@@ -151,7 +150,7 @@ export function userMessageId(input: UserMessageIdInput): string {
     input.parentId,
     input.from.channel,
     input.from.author ?? null,
-    // Un fichier entre par son empreinte : la même donnée sous deux adresses reste le même message.
+    // A file enters by its hash: the same data under two addresses stays the same message.
     input.parts.map((p) => (p.type === 'file' ? { type: 'file', sha256: p.sha256 } : p)),
   ])
 }
@@ -159,13 +158,13 @@ export function userMessageId(input: UserMessageIdInput): string {
 export type ServerItemIdInput = {
   conversationId: string
   parentId: string | null
-  /** Identifiant de l'entrée qui a déclenché la production : élément auquel il répond, ou commande. */
+  /** Identifier of the input that triggered the production: the item it answers, or a command. */
   trigger: string
-  /** Rang parmi les éléments produits pour cette entrée, fixé par elle et jamais recompté. */
+  /** Rank among the items produced for this input, set by it and never recounted. */
   rank: number
 }
 
-/** Identifiant d'un élément produit par le serveur, connu avant que son contenu existe. */
+/** Identifier of an item produced by the server, known before its content exists. */
 export function serverItemId(input: ServerItemIdInput): string {
   return deterministicUuid([
     'wica/server_item/1',

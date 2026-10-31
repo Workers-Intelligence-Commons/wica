@@ -1,5 +1,5 @@
-// Serveur WebSocket pour Node, bâti sur la bibliothèque `ws` : chaque connexion entrante devient
-// un `ServerTransport`. Les autres plateformes passent leur socket à `serveWebSocket`.
+// WebSocket server for Node, built on the `ws` library: each incoming connection becomes a
+// `ServerTransport`. The other platforms pass their socket to `serveWebSocket`.
 
 import type { IncomingMessage } from 'node:http'
 
@@ -11,15 +11,15 @@ import { serveWebSocket, type SocketLike } from './index.ts'
 export type ListenOptions = {
   port: number
   host?: string
-  /** Refuse une connexion avant le protocole, par exemple sur l'origine ; tout passe par défaut. */
+  /** Refuses a connection before the protocol, for example on the origin; everything passes by default. */
   accept?: (request: IncomingMessage) => boolean
 }
 
 export type Listening = {
   port: number
-  /** Ferme le serveur et coupe les connexions ouvertes. */
+  /** Closes the server and cuts the open connections. */
   close: () => Promise<void>
-  /** Coupe toutes les connexions sans fermer le serveur (sert aux tests de coupure). */
+  /** Cuts all connections without closing the server (serves the disconnection tests). */
   dropConnections: () => void
 }
 

@@ -1,5 +1,5 @@
-// Le binaire local lancé comme un vrai processus, servi par stdio, devant un faux service
-// Open Responses en HTTP local.
+// The local binary launched as a real process, served over stdio, in front of a fake Open
+// Responses service over local HTTP.
 
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -24,14 +24,14 @@ function fakeService() {
             id: 'm',
             role: 'assistant',
             status: 'completed',
-            content: [{ type: 'output_text', text: 'Fin.', annotations: [] }],
+            content: [{ type: 'output_text', text: 'End.', annotations: [] }],
           }
         : {
             type: 'function_call',
             id: 'f',
             call_id: 'k1',
             name: 'say',
-            arguments: '{"text":"Bonjour !"}',
+            arguments: '{"text":"Hello!"}',
             status: 'completed',
           }
       response.writeHead(200, { 'content-type': 'text/event-stream' })
@@ -50,8 +50,8 @@ function fakeService() {
   )
 }
 
-describe('binaire local', () => {
-  it('sert une conversation par stdio, avec le modèle configuré par l’environnement', async () => {
+describe('local binary', () => {
+  it('serves a conversation over stdio, with the model configured by the environment', async () => {
     const service = await fakeService()
     const transport = spawnStdio(process.execPath, [main, 'serve', '--stdio'], {
       env: { ...process.env, WICA_MODEL_URL: service.url, WICA_MODEL: 'wpt' },
@@ -59,13 +59,13 @@ describe('binaire local', () => {
     const client = createClient(transport, { from: { channel: 'local' } })
     await client.connect()
     await client.subscribe('c1')
-    await client.send('c1', 'Salut')
+    await client.send('c1', 'Hi')
     await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('délai dépassé')), 10_000)
+      const timer = setTimeout(() => reject(new Error('timed out')), 10_000)
       const off = client.onChange('c1', () => {
         const done = client
           .view('c1')
-          .entries.some((e) => e.type === 'assistant' && e.text === 'Fin.')
+          .entries.some((e) => e.type === 'assistant' && e.text === 'End.')
         if (!done) return
         clearTimeout(timer)
         off()

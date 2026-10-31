@@ -1,4 +1,4 @@
-// Comptes, identités, organisations, clés d'API et serveurs distants dans la base `chat`.
+// Accounts, identities, organizations, API keys and remote servers in the `chat` database.
 
 import type postgres from 'postgres'
 
@@ -10,7 +10,7 @@ import {
   type Principal,
 } from './identity.ts'
 
-/** Identifiants internes triés par date (UUID v7). */
+/** Internal identifiers sorted by date (UUID v7). */
 export function uuidv7(now = Date.now()): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16))
   const time = BigInt(now)
@@ -101,7 +101,7 @@ export class PgIdentityRepo implements IdentityRepo {
     return id
   }
 
-  /** Crée une clé d'API ; le jeton n'est rendu qu'ici, la base n'en garde que l'empreinte. */
+  /** Creates an API key; the token is returned only here, the database keeps only its hash. */
   async createApiKey(owner: { userId: string } | { organizationId: string }, scopes: string[]) {
     const token = randomToken(API_KEY_PREFIX)
     await this.#sql`
@@ -121,7 +121,7 @@ export type ServerIdentity = { serverId: string; ownerId: string }
 
 export const SERVER_TOKEN_PREFIX = 'wicasrv'
 
-/** Serveur distant reconnu par son jeton, s'il n'est pas révoqué. */
+/** Remote server recognized by its token, if it is not revoked. */
 export async function serverByToken(
   sql: postgres.Sql,
   token: string,

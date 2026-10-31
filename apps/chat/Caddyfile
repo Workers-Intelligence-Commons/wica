@@ -1,7 +1,7 @@
-# Entrée du Compose : HTTPS et HTTP/2 devant l'application. Un vrai domaine obtient un certificat
-# public ; `localhost` reçoit un certificat de l'autorité locale de Caddy. Le cache du navigateur
-# suit chaque conversation ouverte par une connexion qui reste ouverte, et HTTP/1.1 n'en permet que
-# 6 par origine : en HTTP/2, elles partagent une seule connexion.
+# Compose entry point: HTTPS and HTTP/2 in front of the application. A real domain gets a public
+# certificate; `localhost` gets a certificate from Caddy's local authority. The browser cache
+# follows each open conversation through a connection that stays open, and HTTP/1.1 allows only
+# 6 of them per origin: over HTTP/2, they share a single connection.
 
 {$WICA_DOMAIN:localhost} {
 	reverse_proxy app:3000

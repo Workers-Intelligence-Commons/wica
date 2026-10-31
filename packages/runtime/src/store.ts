@@ -1,5 +1,5 @@
-// Interface de persistance du journal
-// et sa version en mémoire, qui sert aux tests et au serveur sans persistance.
+// Persistence interface of the journal and its in-memory version, which serves the tests and the
+// server without persistence.
 
 import type { Item, ItemDraft } from '@wica/core'
 
@@ -9,33 +9,34 @@ export type Appended = {
 }
 
 /**
- * Instantané de l'état, dérivé du journal et jetable : les éléments jusqu'à `seq`, tous réglés,
- * pour qu'un tour ne relise que la suite. Aucun élément d'un instantané ne change plus ensuite.
+ * Snapshot of the state, derived from the journal and disposable: the items up to `seq`, all
+ * settled, so that a turn reads only what follows. No item of a snapshot changes afterwards.
  */
 export type Snapshot = { schema: 1; seq: number; items: Item[] }
 
-/** Résultat d'une réclamation : un `epoch`, ou la conversation tenue par un tour vivant. */
+/** Result of a claim: an `epoch`, or the conversation held by a live turn. */
 export type Claim = { epoch: number } | { busyForMs: number }
 
 export interface Store {
   /**
-   * Réclame la conversation pour un bail de `leaseMs` : rend un `epoch` croissant qui périme les
-   * tours précédents. Tant qu'un autre tour tient un bail en cours, rend le temps qui lui reste.
+   * Claims the conversation for a lease of `leaseMs`: returns an increasing `epoch` that makes the
+   * previous turns stale. While another turn holds a current lease, returns the time it has left.
    */
   claim(conversationId: string, leaseMs: number): Promise<Claim>
-  /** Prolonge le bail ; refuse un `epoch` périmé. Chaque écriture le prolonge aussi. */
+  /** Extends the lease; refuses a stale `epoch`. Each write extends it too. */
   renew(conversationId: string, epoch: number): Promise<void>
-  /** Libère le bail à la fin du tour, pour que le suivant n'attende pas son échéance. */
+  /** Releases the lease at the end of the turn, so that the next one does not wait for it to expire. */
   release(conversationId: string, epoch: number): Promise<void>
   /**
-   * Éléments après `fromSeq`. Un élément encore en `streaming` porte le texte de ses lots, recollés
-   * dans l'ordre de leur `idx` : le tour qui le reprend après un arrêt le règle avec ce texte.
+   * Items after `fromSeq`. An item still in `streaming` carries the text of its batches, joined
+   * back in the order of their `idx`: the turn that takes it over after a stop settles it with
+   * this text.
    */
   load(
     conversationId: string,
     fromSeq: number,
   ): Promise<{ salt: string; head: string | null; items: Item[]; interruptRequested: boolean }>
-  /** Ajoute des éléments ; un identifiant déjà présent est accusé sans être dupliqué. */
+  /** Adds items; an identifier already present is acknowledged without being duplicated. */
   append(conversationId: string, items: ItemDraft[], epoch: number): Promise<Appended>
   appendBatch(
     conversationId: string,
@@ -44,13 +45,13 @@ export interface Store {
     text: string,
     epoch: number,
   ): Promise<{ interruptRequested: boolean }>
-  /** Écrit le contenu final et le `status` d'un élément produit en flux, et supprime ses lots. */
+  /** Writes the final content and the `status` of an item produced by streaming, and deletes its batches. */
   settle(conversationId: string, final: ItemDraft, epoch: number): Promise<void>
   setHead(conversationId: string, itemId: string, epoch: number): Promise<void>
   requestInterrupt(conversationId: string): Promise<void>
-  /** Efface la demande d'interruption une fois traitée par le tour qui tient la conversation. */
+  /** Clears the interruption request once processed by the turn that holds the conversation. */
   clearInterrupt(conversationId: string, epoch: number): Promise<void>
-  /** Réclame l'exécution d'un outil ; idempotent pour un même `epoch`, refusé pour un autre. */
+  /** Claims the run of a tool; idempotent for the same `epoch`, refused for another one. */
   claimToolCall(
     conversationId: string,
     callId: string,
@@ -72,12 +73,12 @@ type Conversation = {
   head: string | null
   items: Item[]
   batches: Map<string, Map<number, string>>
-  /** Réclamations d'outils : `callId` vers l'`epoch` qui l'a réclamé. */
+  /** Tool claims: `callId` to the `epoch` that claimed it. */
   toolClaims: Map<string, number>
   interruptRequested: boolean
 }
 
-/** Copie d'un élément ; en `streaming`, son texte est celui de ses lots dans l'ordre de `idx`. */
+/** Copy of an item; in `streaming`, its text is the one of its batches in the order of `idx`. */
 function withBatches(item: Item, batches: Map<number, string> | undefined): Item {
   const copy = structuredClone(item)
   if (copy.status !== 'streaming' || !batches) return copy
@@ -119,7 +120,7 @@ export class MemoryStore implements Store {
 
   #fenced(conversationId: string, epoch: number): Conversation {
     const c = this.#get(conversationId)
-    if (epoch !== c.epoch) throw new StaleEpochError(`epoch ${epoch} périmé (${c.epoch})`)
+    if (epoch !== c.epoch) throw new StaleEpochError(`epoch ${epoch} is stale (${c.epoch})`)
     if (c.lease) c.lease.until = this.#now() + c.lease.ms
     return c
   }
@@ -192,7 +193,7 @@ export class MemoryStore implements Store {
     const c = this.#fenced(conversationId, epoch)
     const index = c.items.findIndex((i) => i.id === final.id)
     const current = c.items[index]
-    if (!current) throw new Error(`élément inconnu : ${final.id}`)
+    if (!current) throw new Error(`unknown item: ${final.id}`)
     c.items[index] = { ...structuredClone(final), seq: current.seq } as Item
     c.batches.delete(final.id)
   }
@@ -211,7 +212,7 @@ export class MemoryStore implements Store {
 
   async claimToolCall(conversationId: string, callId: string, epoch: number) {
     const c = this.#fenced(conversationId, epoch)
-    // Rejouée par le même tour (réponse perdue), la réclamation reste la sienne.
+    // Replayed by the same turn (lost response), the claim stays its own.
     const owner = c.toolClaims.get(callId)
     if (owner !== undefined && owner !== epoch) return 'already_claimed' as const
     c.toolClaims.set(callId, epoch)
@@ -220,13 +221,13 @@ export class MemoryStore implements Store {
 }
 
 export type ResilientOptions = {
-  /** Erreur passagère (réseau coupé, service indisponible) ; par défaut les erreurs réseau de `fetch`. */
+  /** Transient error (network down, service unavailable); by default the network errors of `fetch`. */
   isTransient?: (error: unknown) => boolean
-  /** Première attente avant un nouvel essai ; elle double à chaque échec. 200 ms par défaut. */
+  /** First wait before a new attempt; it doubles at each failure. 200 ms by default. */
   baseDelayMs?: number
-  /** Attente maximale entre deux essais. 30 s par défaut. */
+  /** Maximum wait between two attempts. 30 s by default. */
   maxDelayMs?: number
-  /** Arrête les essais, par exemple à l'arrêt du serveur. */
+  /** Stops the attempts, for example when the server stops. */
   signal?: AbortSignal
 }
 
@@ -234,11 +235,11 @@ const networkError = (error: unknown) =>
   error instanceof TypeError || (error as { retryable?: unknown } | null)?.retryable === true
 
 /**
- * `Store` distant qui réessaie ses opérations pendant une coupure, sans limite de durée (machine
- * endormie, réseau perdu) : un outil en cours se termine et son résultat est écrit à la
- * reconnexion. Les écritures sont rejouables : clé primaire, lot par index, réclamation d'outil
- * idempotente pour un même `epoch`. Une réclamation de conversation rejouée peut au pire trouver
- * son propre bail et attendre son échéance.
+ * Remote `Store` that retries its operations during a disconnection, with no time limit (machine
+ * asleep, network lost): a running tool finishes and its result is written at reconnection. The
+ * writes can be replayed: primary key, batch by index, tool claim idempotent for the same
+ * `epoch`. A replayed conversation claim can at worst find its own lease and wait for it to
+ * expire.
  */
 export function resilientStore(store: Store, options: ResilientOptions = {}): Store {
   const transient = options.isTransient ?? networkError

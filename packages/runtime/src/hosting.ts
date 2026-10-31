@@ -1,18 +1,18 @@
-// Interfaces fournies par l'hôte pour l'exécution sans état, avec leurs versions en mémoire : `Scheduler` réveille une conversation,
-// `SessionStore` garde ce qu'il serait coûteux de renégocier, `CredentialStore` garde les jetons
-// et les rafraîchit sous exclusion mutuelle.
+// Interfaces provided by the host for stateless execution, with their in-memory versions:
+// `Scheduler` wakes a conversation, `SessionStore` keeps what would be costly to negotiate again,
+// `CredentialStore` keeps the tokens and refreshes them under mutual exclusion.
 
 import type { Origin } from '@wica/core'
 
 export interface Scheduler {
   /**
-   * Demande un tour pour la conversation, après `afterMs` au plus tôt. Livraison au moins une
-   * fois : un réveil en double ne fait qu'un tour sans travail.
+   * Requests a turn for the conversation, after `afterMs` at the earliest. At-least-once delivery:
+   * a duplicate wake-up only makes a turn with no work.
    */
   wake(conversationId: string, options?: { afterMs?: number }): Promise<void>
 }
 
-/** Planificateur du processus : chaque réveil appelle le gestionnaire lié, après son délai. */
+/** Process scheduler: each wake-up calls the bound handler, after its delay. */
 export function memoryScheduler() {
   let handler: ((conversationId: string) => Promise<void>) | null = null
   const timers = new Set<ReturnType<typeof setTimeout>>()
@@ -27,7 +27,7 @@ export function memoryScheduler() {
       }, options.afterMs ?? 0)
       timers.add(timer)
     },
-    /** Annule les réveils en attente. */
+    /** Cancels the pending wake-ups. */
     close() {
       for (const timer of timers) clearTimeout(timer)
       timers.clear()
@@ -36,8 +36,8 @@ export function memoryScheduler() {
 }
 
 /**
- * Session d'un client : l'identité résolue par l'hôte (opaque pour le Harness) et son échéance.
- * Une session est un cache : la perdre coûte une nouvelle authentification, jamais une donnée.
+ * Session of a client: the identity resolved by the host (opaque to the Harness) and its expiry.
+ * A session is a cache: losing it costs a new authentication, never any data.
  */
 export type Session = { id: string; identity: unknown; from: Origin; expiresAt: number }
 
@@ -46,9 +46,9 @@ export interface SessionStore {
   put(session: Session): Promise<void>
   delete(sessionId: string): Promise<void>
   /**
-   * Dernier `clientSeq` traité pour cette conversation, qui fait ignorer une commande rejouée.
-   * `key` commence par l'identifiant de la session du serveur, suivi de celui du client : la
-   * suppression d'une session efface aussi ses commandes.
+   * Last `clientSeq` processed for this conversation, which makes a replayed command ignored.
+   * `key` starts with the identifier of the server session, followed by the client's: deleting a
+   * session also clears its commands.
    */
   lastCommand(key: string, conversationId: string): Promise<number | undefined>
   recordCommand(key: string, conversationId: string, clientSeq: number): Promise<void>
@@ -86,17 +86,17 @@ export class MemorySessionStore implements SessionStore {
 export type Credential = { token: string; expiresAt?: number }
 
 export interface CredentialStore {
-  /** Jeton courant ; un jeton échu est rafraîchi d'abord. */
+  /** Current token; an expired token is refreshed first. */
   get(key: string): Promise<Credential | undefined>
   /**
-   * Rafraîchit le jeton sous exclusion mutuelle. `stale` est le jeton refusé : si un autre tour
-   * l'a déjà remplacé, le nouveau est rendu sans second rafraîchissement.
+   * Refreshes the token under mutual exclusion. `stale` is the refused token: if another turn has
+   * already replaced it, the new one is returned without a second refresh.
    */
   refresh(key: string, stale?: string): Promise<Credential | undefined>
   revoke(key: string): Promise<void>
 }
 
-/** Rafraîchissement fourni par l'hôte (OAuth par exemple) : rend le jeton suivant. */
+/** Refresh provided by the host (OAuth for example): returns the next token. */
 export type Refresher = (key: string, current: Credential | undefined) => Promise<Credential>
 
 export class MemoryCredentialStore implements CredentialStore {

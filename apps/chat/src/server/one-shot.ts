@@ -1,6 +1,6 @@
-// Une requête HTTP vue comme une connexion du protocole client : un `hello`, une commande, puis
-// l'accusé. Le serveur embarqué traite ainsi chaque commande dans la requête qui l'apporte, sans
-// connexion durable, ce qui convient à Workers comme au Compose.
+// An HTTP request seen as a client protocol connection: a `hello`, a command, then the
+// acknowledgement. The embedded server thus processes each command in the request that brings
+// it, without a lasting connection, which suits Workers as well as Compose.
 
 import {
   type Envelope,
@@ -40,7 +40,7 @@ export function oneShot(hello: { token: string; sessionId?: string }, envelope: 
         token: hello.token,
         ...(hello.sessionId ? { sessionId: hello.sessionId } : {}),
       }
-      // La commande porte la session du client ; le serveur la range sous la sienne.
+      // The command carries the client session; the server files it under its own.
       yield envelope
     },
     async close() {},

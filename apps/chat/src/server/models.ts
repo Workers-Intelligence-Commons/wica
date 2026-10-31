@@ -1,6 +1,6 @@
-// Modèle d'une conversation : wic-serving en Open Responses par défaut, ou un fournisseur
-// hébergé par pi-ai avec les jetons que la personne a connectés. Les jetons de l'instance
-// (variables d'environnement, fichiers) ne servent jamais aux modèles des personnes.
+// Model of a conversation: wic-serving over Open Responses by default, or a provider hosted by
+// pi-ai with the tokens the person connected. The instance tokens (environment variables, files)
+// never serve the people's models.
 
 import type { AuthContext, AuthEvent, AuthPrompt, Models } from '@earendil-works/pi-ai'
 import { builtinModels } from '@earendil-works/pi-ai/providers/all'
@@ -26,8 +26,8 @@ export type ModelChoice =
   | { kind: 'lorem'; model: LoremModel }
 
 /**
- * `conversations.model` : nul pour le modèle par défaut, `pi:<fournisseur>/<modèle>` pour un
- * fournisseur hébergé, `lorem:<modèle>` pour un faux modèle.
+ * `conversations.model`: null for the default model, `pi:<provider>/<model>` for a hosted
+ * provider, `lorem:<model>` for a fake model.
  */
 export function parseModelChoice(value: string | null | undefined): ModelChoice | null {
   if (!value) return { kind: 'default' }
@@ -37,14 +37,14 @@ export function parseModelChoice(value: string | null | undefined): ModelChoice 
   return match ? { kind: 'pi', provider: match[1] as string, model: match[2] as string } : null
 }
 
-/** Faux modèles proposés quand `WICA_TEST_MODELS` est actif. */
+/** Fake models offered when `WICA_TEST_MODELS` is active. */
 export const testModelOptions = () =>
   LOREM_MODELS.map((model) => ({
     id: `lorem:${model}`,
     name: model === 'lorem' ? 'Lorem ipsum (test)' : 'Lorem ipsum, a tool call each turn (test)',
   }))
 
-/** Aucune source ambiante : ni variable d'environnement, ni fichier de la machine. */
+/** No ambient source: neither an environment variable nor a file of the machine. */
 const noAmbientAuth: AuthContext = {
   env: async () => undefined,
   fileExists: async () => false,
@@ -84,7 +84,7 @@ export function conversationModel(
     models,
     provider: choice.provider,
     model: choice.model,
-    // L'avertissement a été montré à la connexion ; ceci couvre un jeton connecté autrement.
+    // The warning was shown at login; this covers a token connected another way.
     onFirstSubscriptionUse: async (provider) => void (await credentials.markWarned(provider)),
   })
 }
@@ -122,9 +122,9 @@ export type LoginEvent =
 const LOGIN_TIMEOUT_MS = 10 * 60_000
 
 /**
- * Connexion d'un abonnement. Le flux du fournisseur tient dans cette requête ; quand il demande
- * un code, la question est écrite dans `credential_logins` et la réponse de la personne, qui
- * arrive par une autre requête (peut-être une autre invocation sur Workers), y est relue.
+ * Login to a subscription. The provider flow fits in this request; when it asks for a code, the
+ * question is written to `credential_logins` and the person's answer, which arrives through
+ * another request (maybe another invocation on Workers), is read back from there.
  */
 export async function* loginFlow(
   sql: postgres.Sql,

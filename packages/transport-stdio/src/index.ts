@@ -1,6 +1,5 @@
-// Transport stdio : des trames JSON, une par ligne, sur
-// les flux d'un processus local. Le serveur lit stdin et écrit stdout ; le client lance le
-// serveur comme processus enfant.
+// stdio transport: JSON frames, one per line, on the streams of a local process. The server
+// reads stdin and writes stdout; the client launches the server as a child process.
 
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
@@ -15,14 +14,14 @@ import type {
   Transport,
 } from '@wica/protocol'
 
-/** Transport sur deux flux : une trame JSON par ligne. Une ligne illisible est ignorée. */
+/** Transport over two streams: one JSON frame per line. An unreadable line is ignored. */
 export function stdioTransport<Out extends Frame, In extends Frame>(
   input: Readable,
   output: Writable,
 ): Transport<Out, In> {
   const lines = createInterface({ input, crlfDelay: Infinity })
-  // L'itérateur naît avec le transport : readline lit dès sa création, et une ligne arrivée
-  // avant la première lecture serait sinon perdue.
+  // The iterator is born with the transport: readline reads from its creation, and a line that
+  // arrived before the first read would otherwise be lost.
   const pending = lines[Symbol.asyncIterator]()
   return {
     send: (frame) =>
@@ -39,7 +38,7 @@ export function stdioTransport<Out extends Frame, In extends Frame>(
         try {
           yield JSON.parse(line) as In
         } catch {
-          // Ligne qui n'est pas une trame : rien à transmettre.
+          // A line that is not a frame: nothing to pass on.
         }
       }
     },
@@ -50,11 +49,11 @@ export function stdioTransport<Out extends Frame, In extends Frame>(
   }
 }
 
-/** Côté serveur : le protocole client sur stdin et stdout du processus. */
+/** Server side: the client protocol on the stdin and stdout of the process. */
 export const serveStdio = (): ServerTransport =>
   stdioTransport<ServerFrame, ClientFrame>(process.stdin, process.stdout)
 
-/** Côté client : lance le serveur et parle avec lui par ses flux ; `close` l'arrête. */
+/** Client side: launches the server and talks with it through its streams; `close` stops it. */
 export function spawnStdio(
   command: string,
   args: string[] = [],
