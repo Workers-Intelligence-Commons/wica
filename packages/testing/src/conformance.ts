@@ -102,6 +102,33 @@ export function storeConformance(name: string, make: () => Store | Promise<Store
       expect((await store.load('c', 0)).interruptRequested).toBe(false)
     })
 
+    // Le tour qui reprend une conversation après un arrêt règle l'élément ouvert avec ce texte.
+    it('relit un élément en flux avec ses lots recollés dans l’ordre, puis son texte final', async () => {
+      const store = await make()
+      const epoch = await claimed(store, 'c')
+      const open: ItemDraft = {
+        id: 'r',
+        parentId: null,
+        at: '2026-10-30T10:00:00.000Z',
+        status: 'streaming',
+        kind: 'assistant_text',
+        text: '',
+        audience: 'private',
+      }
+      await store.append('c', [open], epoch)
+      await store.appendBatch('c', 'r', 1, 'jour', epoch)
+      await store.appendBatch('c', 'r', 0, 'Bon', epoch)
+      expect((await store.load('c', 0)).items[0]).toMatchObject({
+        status: 'streaming',
+        text: 'Bonjour',
+      })
+      await store.settle('c', { ...open, status: 'done', text: 'Bonjour !' }, epoch)
+      expect((await store.load('c', 0)).items[0]).toMatchObject({
+        status: 'done',
+        text: 'Bonjour !',
+      })
+    })
+
     it('garde le dernier instantané écrit', async () => {
       const store = await make()
       const epoch = await claimed(store, 'c')

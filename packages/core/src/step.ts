@@ -177,11 +177,27 @@ function toolSpec(s: State, name: string): ToolSpec | undefined {
 /** Ferme les éléments encore ouverts en flux avec un statut final. */
 function closeStream(s: State, status: Item['status']): Step {
   const streaming = all(s).filter((i) => i.status === 'streaming')
+  // Une réponse interrompue est celle que la personne a vue s'écrire : son texte lui est adressé
+  // comme à la fin d'une réponse sans appel d'outil, car un appel n'existe qu'à la fin du message.
+  const lastText =
+    status === 'interrupted'
+      ? streaming.findLast((i) => i.kind === 'assistant_text')?.id
+      : undefined
   let state: State = { ...s, stream: null }
   const intents: Intent[] = []
   for (const item of streaming) {
     const open = s.stream?.open.find((o) => o.id === item.id)
-    const settled = { ...item, status, ...(open ? { text: open.text } : {}) } as ItemDraft
+    let settled = { ...item, status, ...(open ? { text: open.text } : {}) } as ItemDraft
+    if (settled.kind === 'assistant_text' && status === 'interrupted') {
+      const promoted = s.policy.freeText === 'user_tool' && settled.id === lastText
+      if (s.policy.freeText === 'direct' || promoted) {
+        settled = {
+          ...settled,
+          audience: 'user',
+          ...(promoted ? { meta: { ...settled.meta, promoted: true } } : {}),
+        }
+      }
+    }
     state = replace(state, settled)
     intents.push({ t: 'settle', item: settled })
   }

@@ -9,14 +9,17 @@
   "type": "module",
   "dependencies": {
     "@wica/acp": "workspace:*",
+    "@wica/chat-remote": "workspace:*",
     "@wica/client": "workspace:*",
     "@wica/core": "workspace:*",
     "@wica/mcp": "workspace:*",
     "@wica/model-compat": "workspace:*",
     "@wica/protocol": "workspace:*",
     "@wica/runtime": "workspace:*",
+    "@wica/testing": "workspace:*",
     "@wica/tools-node": "workspace:*",
     "@wica/tools-user": "workspace:*",
+    "@wica/transport-inbox": "workspace:*",
     "@wica/transport-memory": "workspace:*",
     "@wica/transport-stdio": "workspace:*",
     "@wica/transport-ws": "workspace:*"

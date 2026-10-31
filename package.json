@@ -4,10 +4,12 @@
   "license": "AGPL-3.0-or-later",
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/*",
+    "vendor/wic-design-system/packages/*"
   ],
   "type": "module",
   "scripts": {
+    "postinstall": "bun run --filter @workers-intelligence-commons/tokens build && bun run --filter @workers-intelligence-commons/components build",
     "boundaries": "depcruise packages $(test -d apps && echo apps) --config .dependency-cruiser.cjs",
     "licenses": "node scripts/check-licenses.mjs",
     "ready": "vp check && vp test && bun run boundaries && bun run licenses"

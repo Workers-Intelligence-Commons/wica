@@ -27,6 +27,10 @@ export interface Store {
   renew(conversationId: string, epoch: number): Promise<void>
   /** Libère le bail à la fin du tour, pour que le suivant n'attende pas son échéance. */
   release(conversationId: string, epoch: number): Promise<void>
+  /**
+   * Éléments après `fromSeq`. Un élément encore en `streaming` porte le texte de ses lots, recollés
+   * dans l'ordre de leur `idx` : le tour qui le reprend après un arrêt le règle avec ce texte.
+   */
   load(
     conversationId: string,
     fromSeq: number,
@@ -71,6 +75,18 @@ type Conversation = {
   /** Réclamations d'outils : `callId` vers l'`epoch` qui l'a réclamé. */
   toolClaims: Map<string, number>
   interruptRequested: boolean
+}
+
+/** Copie d'un élément ; en `streaming`, son texte est celui de ses lots dans l'ordre de `idx`. */
+function withBatches(item: Item, batches: Map<number, string> | undefined): Item {
+  const copy = structuredClone(item)
+  if (copy.status !== 'streaming' || !batches) return copy
+  if (copy.kind !== 'assistant_text' && copy.kind !== 'reasoning') return copy
+  const text = [...batches]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, t]) => t)
+    .join('')
+  return { ...copy, text }
 }
 
 export class MemoryStore implements Store {
@@ -139,7 +155,7 @@ export class MemoryStore implements Store {
     return {
       salt: c.salt,
       head: c.head,
-      items: structuredClone(c.items.filter((i) => i.seq > fromSeq)),
+      items: c.items.filter((i) => i.seq > fromSeq).map((i) => withBatches(i, c.batches.get(i.id))),
       interruptRequested: c.interruptRequested,
     }
   }

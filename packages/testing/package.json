@@ -5,7 +5,8 @@
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./lorem": "./src/lorem.ts"
   },
   "dependencies": {
     "@wica/acp": "workspace:*",

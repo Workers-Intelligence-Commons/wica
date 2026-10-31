@@ -5,6 +5,7 @@
 //   wica serve --ws [--port N] [--host H] [--token T]
 //   wica connect <url> --token T  client vers un serveur WebSocket
 //   wica acp                      agent pour un éditeur, par l'Agent Client Protocol sur stdio
+//   wica remote <url>             serveur distant d'un chat, jeton dans WICA_CHAT_TOKEN
 
 import { randomBytes } from 'node:crypto'
 import { fileURLToPath } from 'node:url'
@@ -19,6 +20,7 @@ import { listenWebSocket } from '@wica/transport-ws/node'
 
 import { serveAcp } from './acp.ts'
 import { runCli } from './cli.ts'
+import { serveRemote } from './remote.ts'
 import { ConfigError, configFromEnv, createLocalServer } from './server.ts'
 
 const USAGE = `Utilisation :
@@ -27,8 +29,10 @@ const USAGE = `Utilisation :
   wica serve --ws [--port 7777] [--host 127.0.0.1] [--token JETON] [--yes]
   wica connect ws://hôte:port --token JETON [--conversation ID]
   wica acp [--yes]
+  WICA_CHAT_TOKEN=JETON wica remote https://chat.example.org [--yes]
 
 Modèle : WICA_MODEL_URL, WICA_MODEL, WICA_API_KEY (facultatif), WICA_REASONING_EFFORT (facultatif).
+Sans serveur de modèle : WICA_MODEL=lorem (texte écrit à l'avance) ou lorem-tools (un outil à chaque tour).
 --yes autorise tous les outils sans demander ; sinon toute action qui n'est pas une lecture demande l'accord.`
 
 async function main(argv: string[]) {
@@ -55,6 +59,22 @@ async function main(argv: string[]) {
   if (command === 'acp') {
     // stdout porte ACP : rien d'autre ne doit y être écrit.
     await serveAcp(config())
+    return
+  }
+
+  if (command === 'remote') {
+    if (!target) throw new ConfigError('remote demande l’adresse du chat.')
+    const token = process.env.WICA_CHAT_TOKEN
+    if (!token)
+      throw new ConfigError(
+        'WICA_CHAT_TOKEN est requis : jeton donné par le chat à la création du serveur.',
+      )
+    const { serverId, done } = await serveRemote(config(), { url: target, token }, (message) => {
+      process.stderr.write(`le chat refuse ce serveur : ${message}\n`)
+      process.exit(1)
+    })
+    process.stderr.write(`serveur ${serverId} relié à ${target}, dossier ${process.cwd()}\n`)
+    await done
     return
   }
 

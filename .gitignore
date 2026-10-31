@@ -6,3 +6,4 @@ dist
 !.env.example
 .playwright-mcp/
 .claude/worktrees/
+.wrangler

@@ -395,7 +395,7 @@ async function claimedTurn(
       // Une entrée non fiable ne déclenche un outil destructif qu'avec une approbation, quelle
       // que soit la politique de l'hôte.
       if (decision === 'allow' && trust === 'untrusted' && isDestructive(annotations)) {
-        decision = { ask: `Autoriser ${call.tool} ? La demande vient d'une entrée non fiable.` }
+        decision = { ask: `Allow ${call.tool}? The request comes from untrusted input.` }
       }
       if (typeof decision === 'object' && 'ask' in decision) {
         return apply({

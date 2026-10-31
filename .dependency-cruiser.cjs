@@ -17,6 +17,7 @@ const allowed = {
   client: ['core', 'protocol', 'tools-user'],
   'client-react': ['core', 'protocol', 'tools-user', 'client'],
   acp: ['core', 'protocol', 'tools-user', 'client'],
+  'chat-remote': ['core', 'protocol', 'runtime', 'transport-inbox'],
 }
 const nodeAllowed = ['tools-node', 'transport-inbox', 'transport-ws', 'transport-stdio']
 // Dans `mcp` et `acp`, seule l'entrée `./node` dépend de Node : le lancement de serveurs MCP
@@ -59,9 +60,22 @@ module.exports = {
       from: { path: '^packages/' },
       to: { path: '^apps/' },
     },
-    { name: 'pas-de-cycle', severity: 'error', from: {}, to: { circular: true } },
-    // Un import non résolu échapperait aux règles du graphe : il est refusé.
-    { name: 'import-resolu', severity: 'error', from: {}, to: { couldNotResolve: true } },
+    // L'arbre des routes généré par TanStack importe le routeur, qui l'importe : ce retour n'est
+    // qu'un import de type, que le générateur impose.
+    {
+      name: 'pas-de-cycle',
+      severity: 'error',
+      from: {},
+      to: { circular: true, viaNot: 'routeTree\\.gen\\.ts$' },
+    },
+    // Un import non résolu échapperait aux règles du graphe : il est refusé. Les modules
+    // `cloudflare:` sont fournis par le moteur de Workers, pas par un fichier.
+    {
+      name: 'import-resolu',
+      severity: 'error',
+      from: {},
+      to: { couldNotResolve: true, pathNot: '^cloudflare:' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },
@@ -72,8 +86,8 @@ module.exports = {
     enhancedResolveOptions: {
       exportsFields: ['exports'],
       conditionNames: ['import', 'default'],
-      extensions: ['.ts', '.js', '.mjs', '.cjs'],
+      extensions: ['.ts', '.tsx', '.js', '.mjs', '.cjs'],
     },
-    exclude: { path: '(^|/)test/' },
+    exclude: { path: '(^|/)(test|dist)/' },
   },
 }

@@ -84,7 +84,7 @@ export const saySpec: ToolSpec = {
     properties: { text: { type: 'string' } },
     required: ['text'],
   },
-  annotations: { readOnlyHint: true },
+  annotations: { readOnlyHint: true, openWorldHint: false },
   channel: 'user',
   runsOn: 'server',
 }

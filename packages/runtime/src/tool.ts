@@ -154,7 +154,7 @@ export const isOpenWorld = (a: ToolAnnotations) => a.openWorldHint !== false
  */
 export const unattended: Authorize = (call) =>
   isDestructive(call.annotations) || isOpenWorld(call.annotations)
-    ? { ask: `Autoriser ${call.tool} ?` }
+    ? { ask: `Allow ${call.tool}?` }
     : 'allow'
 
 /**

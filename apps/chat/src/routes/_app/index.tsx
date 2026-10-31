@@ -1,0 +1,116 @@
+// Nouvelle conversation : choix du serveur (embarqué ou distant) et du modèle, puis premier
+// message. La conversation est créée par l'API, attendue par la synchro, et le message part
+// aussitôt, affiché avant sa confirmation.
+
+import { eq, isNull, useDbClient, useLiveQuery } from '@tanstack/react-db'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Composer, SectionHeading, Select } from '@workers-intelligence-commons/components'
+import { useEffect, useState } from 'react'
+
+import { cacheName, touchConversation } from '../../client/cache.ts'
+import {
+  conversationsCollection,
+  itemsCollection,
+  serversCollection,
+} from '../../client/collections.ts'
+import { sendMessage } from '../../client/commands.ts'
+import { prepareCache } from '../../client/dependencies.ts'
+
+export const Route = createFileRoute('/_app/')({ component: NewConversation })
+
+type ModelOption = { id: string | null; name: string }
+
+export function useModels() {
+  const [models, setModels] = useState<ModelOption[] | null>(null)
+  useEffect(() => {
+    void fetch('/api/models')
+      .then((r) => r.json() as Promise<{ default: ModelOption | null; models: ModelOption[] }>)
+      .then((body) => setModels([...(body.default ? [body.default] : []), ...body.models]))
+      .catch(() => setModels([]))
+  }, [])
+  return models
+}
+
+function NewConversation() {
+  const { me } = Route.useRouteContext()
+  const db = useDbClient()
+  const navigate = useNavigate()
+  const models = useModels()
+  const { data: servers } = useLiveQuery({
+    query: (q) =>
+      q
+        .from({ s: serversCollection })
+        .where(({ s }) => eq(s.owner_id, me.id))
+        .where(({ s }) => isNull(s.revoked_at)),
+  })
+  const [serverId, setServerId] = useState<string>('')
+  const [model, setModel] = useState<string>('')
+  // Sans modèle par défaut, la liste commence par un autre modèle : le choix suit ce qui est
+  // affiché, au lieu d'envoyer le modèle par défaut absent.
+  useEffect(() => {
+    if (models && !models.some((m) => (m.id ?? '') === model)) setModel(models[0]?.id ?? '')
+  }, [models, model])
+  const [failed, setFailed] = useState<string | null>(null)
+
+  async function start(text: string) {
+    setFailed(null)
+    const response = await fetch('/api/conversations', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ serverId: serverId || null, model: model || null }),
+    })
+    if (!response.ok) {
+      setFailed('The conversation could not be created.')
+      return
+    }
+    const created = (await response.json()) as { id: string; salt: string; txid: number }
+    await db.collection(conversationsCollection).utils.awaitTxId?.(created.txid, 15_000)
+    await touchConversation(me.id, created.id)
+    await prepareCache(cacheName(me.id, created.id))
+    const items = db.collection(itemsCollection(created.id))
+    void sendMessage({
+      items,
+      account: me.id,
+      conversationId: created.id,
+      salt: created.salt,
+      parentId: null,
+      parts: [{ type: 'text', text }],
+      seq: 1,
+    }).catch(() => {})
+    await navigate({ to: '/c/$conversationId', params: { conversationId: created.id } })
+  }
+
+  return (
+    <section className="conversation start">
+      <div className="start-intro">
+        <SectionHeading kicker="new conversation">Start a conversation</SectionHeading>
+      </div>
+      <div className="choices">
+        <Select label="Server" value={serverId} onChange={(e) => setServerId(e.target.value)}>
+          <option value="">Chat server (no access to any system)</option>
+          {servers.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </Select>
+        <Select
+          label="Model"
+          value={model}
+          onChange={(e) => setModel(e.target.value)}
+          disabled={!models}
+        >
+          {(models ?? []).map((m) => (
+            <option key={m.id ?? ''} value={m.id ?? ''}>
+              {m.name}
+            </option>
+          ))}
+        </Select>
+      </div>
+      <p className="failure" role="alert">
+        {failed}
+      </p>
+      <Composer onSend={start} placeholder="Your first message" />
+    </section>
+  )
+}

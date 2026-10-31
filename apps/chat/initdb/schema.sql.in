@@ -1,0 +1,213 @@
+-- Schéma de la base `chat`. Postgres fait foi ; Electric ne lit que les tables publiées, et
+-- seulement les colonnes que le proxy de l'application lui demande.
+
+SET ROLE chat_app;
+
+-- Identité vue par l'application : comptes internes, identités externes, organisations.
+CREATE TABLE users (
+  id uuid PRIMARY KEY,
+  display_name text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE identities (
+  provider text NOT NULL,
+  subject text NOT NULL,
+  user_id uuid NOT NULL REFERENCES users ON DELETE CASCADE,
+  PRIMARY KEY (provider, subject)
+);
+
+CREATE TABLE organizations (
+  id uuid PRIMARY KEY,
+  name text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE memberships (
+  organization_id uuid NOT NULL REFERENCES organizations ON DELETE CASCADE,
+  user_id uuid NOT NULL REFERENCES users ON DELETE CASCADE,
+  roles text[] NOT NULL DEFAULT '{}',
+  PRIMARY KEY (organization_id, user_id)
+);
+
+CREATE TABLE api_keys (
+  id uuid PRIMARY KEY,
+  key_hash text NOT NULL UNIQUE,
+  user_id uuid REFERENCES users ON DELETE CASCADE,
+  organization_id uuid REFERENCES organizations ON DELETE CASCADE,
+  scopes text[] NOT NULL DEFAULT '{}',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  revoked_at timestamptz,
+  CHECK ((user_id IS NULL) <> (organization_id IS NULL))
+);
+
+-- Prévue pour le SSO d'entreprise.
+CREATE TABLE verified_domains (
+  organization_id uuid NOT NULL REFERENCES organizations ON DELETE CASCADE,
+  domain text PRIMARY KEY,
+  verified_at timestamptz
+);
+
+-- Serveurs distants : machine d'une personne ou bac à sable, authentifiés par leur jeton.
+CREATE TABLE servers (
+  id uuid PRIMARY KEY,
+  owner_id uuid NOT NULL REFERENCES users ON DELETE CASCADE,
+  name text NOT NULL,
+  token_hash text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  last_seen_at timestamptz,
+  revoked_at timestamptz
+);
+
+-- Une discussion. `owner_id` est nul seulement pour une conversation créée par le Store
+-- lui-même ; l'application crée toujours les siennes avec leur propriétaire.
+CREATE TABLE conversations (
+  id text PRIMARY KEY,
+  owner_id uuid REFERENCES users ON DELETE CASCADE,
+  organization_id uuid REFERENCES organizations ON DELETE SET NULL,
+  server_id uuid REFERENCES servers ON DELETE SET NULL,
+  parent_conversation_id text REFERENCES conversations ON DELETE CASCADE,
+  parent_call_id text,
+  title text NOT NULL DEFAULT '',
+  model text,
+  head_item_id text,
+  id_salt text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX conversations_owner ON conversations (owner_id, updated_at DESC);
+
+-- État d'écriture d'une conversation, jamais synchronisé : chaque écriture prolonge le bail, et
+-- le porter sur `conversations` enverrait une mise à jour à chaque client à chaque lot de tokens.
+CREATE TABLE conversation_writers (
+  conversation_id text PRIMARY KEY REFERENCES conversations ON DELETE CASCADE,
+  last_seq integer NOT NULL DEFAULT 0,
+  writer_epoch integer NOT NULL DEFAULT 0,
+  lease_until timestamptz,
+  lease_ms integer,
+  interrupt_requested_at timestamptz
+);
+
+CREATE TABLE items (
+  conversation_id text NOT NULL REFERENCES conversations ON DELETE CASCADE,
+  id text NOT NULL,
+  parent_id text,
+  seq integer NOT NULL,
+  kind text NOT NULL,
+  payload jsonb NOT NULL,
+  status text NOT NULL CHECK (status IN ('streaming', 'done', 'interrupted', 'failed')),
+  -- Gros résultat d'outil : le contenu complet est dans `blobs`, `payload` n'en garde qu'un aperçu.
+  blob_sha256 text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (conversation_id, id),
+  UNIQUE (conversation_id, seq)
+);
+
+CREATE TABLE item_chunks (
+  conversation_id text NOT NULL,
+  item_id text NOT NULL,
+  idx integer NOT NULL,
+  text text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (conversation_id, item_id, idx),
+  FOREIGN KEY (conversation_id, item_id) REFERENCES items ON DELETE CASCADE
+);
+
+CREATE TABLE blobs (
+  sha256 text PRIMARY KEY,
+  data jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE snapshots (
+  conversation_id text PRIMARY KEY REFERENCES conversations ON DELETE CASCADE,
+  data jsonb NOT NULL
+);
+
+CREATE TABLE tool_claims (
+  conversation_id text NOT NULL REFERENCES conversations ON DELETE CASCADE,
+  call_id text NOT NULL,
+  epoch integer NOT NULL,
+  PRIMARY KEY (conversation_id, call_id)
+);
+
+-- Boîte de commandes : `server_id` nul pour le serveur embarqué.
+CREATE TABLE commands (
+  id text PRIMARY KEY,
+  conversation_id text NOT NULL REFERENCES conversations ON DELETE CASCADE,
+  server_id uuid REFERENCES servers ON DELETE CASCADE,
+  kind text NOT NULL,
+  payload jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  acked_at timestamptz,
+  ack jsonb
+);
+CREATE INDEX commands_pending ON commands (server_id, created_at) WHERE acked_at IS NULL;
+
+CREATE TABLE sessions (
+  id text PRIMARY KEY,
+  user_id uuid REFERENCES users ON DELETE CASCADE,
+  server_id uuid REFERENCES servers ON DELETE CASCADE,
+  tools_hash text,
+  state jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  last_seen_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Dernier `clientSeq` traité par client et par conversation.
+CREATE TABLE session_commands (
+  session_id text NOT NULL REFERENCES sessions ON DELETE CASCADE,
+  key text NOT NULL,
+  conversation_id text NOT NULL,
+  client_seq integer NOT NULL,
+  PRIMARY KEY (key, conversation_id)
+);
+
+-- Jetons de modèle connectés par les personnes, chiffrés par la clé de l'instance. Aucune
+-- shape, aucun droit pour `electric`, jamais dans `items`.
+CREATE TABLE model_credentials (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES users ON DELETE CASCADE,
+  provider text NOT NULL,
+  kind text NOT NULL CHECK (kind IN ('api_key', 'oauth')),
+  ciphertext text NOT NULL,
+  key_id text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  revoked_at timestamptz,
+  warned_at timestamptz
+);
+CREATE UNIQUE INDEX model_credentials_current ON model_credentials (user_id, provider)
+  WHERE revoked_at IS NULL;
+
+-- Connexions d'abonnement en cours : la question posée par le fournisseur et la réponse de la
+-- personne, qui arrive par une autre requête.
+CREATE TABLE credential_logins (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES users ON DELETE CASCADE,
+  prompt jsonb,
+  answer text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Réveils du planificateur du Compose, lus avec `FOR UPDATE SKIP LOCKED`. `rearm_at` garde le
+-- réveil demandé pendant qu'un tour tient la ligne.
+CREATE TABLE wakeups (
+  conversation_id text PRIMARY KEY REFERENCES conversations ON DELETE CASCADE,
+  due_at timestamptz NOT NULL,
+  claimed_until timestamptz,
+  rearm_at timestamptz
+);
+
+RESET ROLE;
+
+-- Electric : lecture seule des tables synchronisées, publiées une fois pour toutes ici.
+GRANT USAGE ON SCHEMA public TO electric;
+GRANT SELECT ON conversations, items, item_chunks, commands, servers TO electric;
+ALTER TABLE conversations REPLICA IDENTITY FULL;
+ALTER TABLE items REPLICA IDENTITY FULL;
+ALTER TABLE item_chunks REPLICA IDENTITY FULL;
+ALTER TABLE commands REPLICA IDENTITY FULL;
+ALTER TABLE servers REPLICA IDENTITY FULL;
+CREATE PUBLICATION electric_publication_default
+  FOR TABLE conversations, items, item_chunks, commands, servers;

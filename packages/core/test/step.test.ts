@@ -158,7 +158,24 @@ describe('step', () => {
     expect((intents[0] as { item: ItemDraft }).item).toMatchObject({
       status: 'interrupted',
       text: 'Début',
+      audience: 'user',
     })
+  })
+
+  // La personne a vu ce texte s'écrire : interrompu, il reste le sien, et l'écran le montre.
+  it('adresse à la personne le texte d’une réponse interrompue', () => {
+    for (const freeText of ['user_tool', 'direct'] as const) {
+      const h = host({ policy: { freeText } })
+      h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Bonjour' }] })
+      h.send({ t: 'resume' })
+      h.send({ t: 'model_delta', delta: { type: 'text', text: 'Début' } })
+      h.send({ t: 'interrupt' })
+      expect(journal(h.state).find((i) => i.kind === 'assistant_text')).toMatchObject({
+        status: 'interrupted',
+        text: 'Début',
+        audience: 'user',
+      })
+    }
   })
 
   it("interrompt proprement : flux réglé et résultat d'erreur pour chaque appel sans résultat", () => {
