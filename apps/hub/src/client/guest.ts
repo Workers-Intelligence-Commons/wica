@@ -2,8 +2,9 @@
 // the kinds of consent stay in this browser's localStorage, and every request to the API carries
 // the key, with the fingerprint of the browser that counts their daily messages. The key exists
 // only once the person agrees to the fingerprint; signing in hands its conversations to the account.
+// The guest chat component on another site hands its key over in the address (`#guest=`).
 
-import type { ConsentId } from '../shared/consent.ts'
+import { type ConsentId, isConsentId } from '../shared/consent.ts'
 
 const KEY = 'wica-guest'
 const CONSENTS = 'wica-consents'
@@ -80,15 +81,48 @@ export const apiFetch = (input: string, init: RequestInit = {}) =>
   })
 
 /**
- * After a sign-in, the guest's conversations become the account's. The key is forgotten once the
- * server took them, or when it no longer knows the key.
+ * After a sign-in, the guest's conversations become the account's. The key kept in this browser
+ * is forgotten once the server took them, or when it no longer knows the key.
  */
-export async function claimGuest() {
-  const key = guestKey()
+export async function claimGuest(key = guestKey()) {
   if (!key) return
   const response = await fetch('/api/guest/claim', {
     method: 'POST',
     headers: { 'x-wica-guest': `${key.id}.${key.secret}` },
   })
-  if (response.ok || response.status === 404) localStorage.removeItem(KEY)
+  const kept = guestKey()
+  if ((response.ok || response.status === 404) && kept?.id === key.id) localStorage.removeItem(KEY)
+}
+
+/**
+ * A key handed over by the guest chat component on another site, whose storage this site cannot
+ * read: the account signed in takes its conversations, a guest without a key adopts it, and a
+ * guest with another key receives its conversations. The key leaves the address at once; the
+ * consents given in the component come with it.
+ */
+export async function acceptHandOff(signedIn: boolean) {
+  const params = new URLSearchParams(location.hash.slice(1))
+  const handed = params.get('guest')
+  if (!handed) return
+  const consents = params.get('consent')?.split(',') ?? []
+  params.delete('guest')
+  params.delete('consent')
+  const rest = params.toString()
+  history.replaceState(
+    history.state,
+    '',
+    `${location.pathname}${location.search}${rest ? `#${rest}` : ''}`,
+  )
+  const [id, secret] = handed.split('.')
+  if (!id || !secret) return
+  for (const kind of consents) if (isConsentId(kind)) answerConsent(kind, true)
+  if (signedIn) return claimGuest({ id, secret })
+  const known = guestKey()
+  if (!known) return localStorage.setItem(KEY, JSON.stringify({ id, secret }))
+  if (known.id === id) return
+  await fetch('/api/guest/merge', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-wica-guest': `${known.id}.${known.secret}` },
+    body: JSON.stringify({ key: handed }),
+  })
 }

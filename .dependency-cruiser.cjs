@@ -61,12 +61,12 @@ module.exports = {
       from: { path: '^packages/' },
       to: { path: '^apps/' },
     },
-    // Hub layers. The pages (`client`, `routes`, `ui`, the router) reach the server only by a
-    // dynamic import in a branch that runs on the server.
+    // Hub layers. The pages (`client`, `routes`, `ui`, the router) and the guest chat component
+    // (`embed`) reach the server only by a dynamic import in a branch that runs on the server.
     {
       name: 'hub-pages-without-server',
       severity: 'error',
-      from: { path: `${hub}(client|routes|ui)/|${hub}(client|router)\\.tsx$` },
+      from: { path: `${hub}(client|routes|ui|embed)/|${hub}(client|router)\\.tsx$` },
       to: { path: `${hub}(server|platform)/`, dependencyTypesNot: ['dynamic-import'] },
     },
     // `shared` is read by the pages and the server: it depends on neither.
@@ -81,7 +81,7 @@ module.exports = {
       name: 'hub-server-without-platform',
       severity: 'error',
       from: { path: `${hub}server/` },
-      to: { path: `${hub}(platform|client|routes|ui)/` },
+      to: { path: `${hub}(platform|client|routes|ui|embed)/` },
     },
     // A storage backend is reached through the contracts of `data.ts`, and is assembled only by
     // the platform; no backend reaches another.
@@ -122,12 +122,12 @@ module.exports = {
       to: { circular: true, viaNot: 'routeTree\\.gen\\.ts$' },
     },
     // An unresolved import would escape the graph rules: it is refused. The `cloudflare:` modules
-    // are provided by the Workers runtime, not by a file.
+    // are provided by the Workers runtime, and a file read as text (`?raw`) by Vite.
     {
       name: 'import-resolved',
       severity: 'error',
       from: {},
-      to: { couldNotResolve: true, pathNot: '^cloudflare:' },
+      to: { couldNotResolve: true, pathNot: '^cloudflare:|\\?raw$' },
     },
   ],
   options: {

@@ -145,8 +145,9 @@ export function conversationTurns(deps: TurnDeps) {
       exp: Date.now() + COMMAND_TOKEN_MS,
       purpose: 'command',
     })
+    const resumed = await resumableSession(deps.sessions, from.harnessSession, from.userId)
     const { transport, result } = oneShot(
-      { token, ...(from.harnessSession ? { sessionId: from.harnessSession } : {}) },
+      { token, ...(resumed ? { sessionId: resumed } : {}) },
       envelope,
     )
     const harness = await harnessFor(envelope.conversationId)
@@ -184,3 +185,20 @@ export function conversationTurns(deps: TurnDeps) {
 }
 
 export type ConversationTurns = ReturnType<typeof conversationTurns>
+
+/**
+ * The harness session a command may resume: only one of the same person. A resumed session keeps
+ * the identity it was opened with, so the session of a guest who then signed in, or of another
+ * account in the same tab, would act as them.
+ */
+export async function resumableSession(
+  sessions: SessionStore,
+  sessionId: string | undefined,
+  userId: string,
+): Promise<string | undefined> {
+  if (!sessionId) return undefined
+  const session = await sessions.get(sessionId)
+  return (session?.identity as { userId?: string } | undefined)?.userId === userId
+    ? sessionId
+    : undefined
+}

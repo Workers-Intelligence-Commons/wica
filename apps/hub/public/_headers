@@ -1,0 +1,4 @@
+# Workers static files: the guest chat component (`/embed/`) loads as a module, with its parts and
+# fonts, from the pages of other sites. Its files hold no data, so any site may read them.
+/embed/*
+  Access-Control-Allow-Origin: *

@@ -3,6 +3,10 @@
 # follows each open conversation through a connection that stays open, and HTTP/1.1 allows only
 # 6 of them per origin: over HTTP/2, they share a single connection.
 
+# The guest chat component (`/embed/`) loads as a module, with its parts and fonts, from the pages
+# of other sites: its files hold no data, so any site may read them.
+
 {$WICA_DOMAIN:localhost} {
+	header /embed/* Access-Control-Allow-Origin "*"
 	reverse_proxy app:3000
 }

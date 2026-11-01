@@ -107,10 +107,10 @@ export const d1ConversationIndex = (db: D1Db): D1ConversationIndex => ({
     return rows.map((r) => r.id)
   },
 
-  async claim(guestId, userId) {
+  async claim(guestId, to) {
     await db
       .update(c)
-      .set({ ownerId: userId, guestId: null })
+      .set(to.kind === 'user' ? { ownerId: to.id, guestId: null } : { guestId: to.id })
       .where(and(isNull(c.ownerId), eq(c.guestId, guestId)))
   },
 

@@ -12,10 +12,10 @@
   },
   "scripts": {
     "dev": "vp dev",
-    "build": "vp build",
+    "build": "vp build && vp build --mode embed",
     "start": "node node/start.mjs",
-    "build:workers": "WICA_TARGET=workers vp build",
-    "deploy:workers": "WICA_TARGET=workers vp build && wrangler d1 migrations apply DB --remote && wrangler deploy"
+    "build:workers": "WICA_TARGET=workers vp build && vp build --mode embed",
+    "deploy:workers": "bun run build:workers && wrangler d1 migrations apply DB --remote && wrangler deploy"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.4.0",

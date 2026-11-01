@@ -31,6 +31,23 @@ describe('configuration', () => {
     expect(() => readConfig({ ...base, WICA_AUTH: 'oidc' })).toThrow(/OIDC_ISSUER/)
     expect(() => readConfig({ ...base, WICA_MODEL_URL: 'http://m/v1' })).toThrow(ConfigError)
   })
+
+  // The browser compares the `Origin` it sends with each listed site exactly: an entry with a
+  // path or a trailing slash would never match, so it stops startup instead.
+  it('lists the sites that may embed the guest chat, as origins', () => {
+    const guests = { ...base, WICA_GUESTS: '1', WICA_MODEL: 'wpt', WICA_MODEL_URL: 'http://m/v1' }
+    expect(
+      readConfig({ ...guests, WICA_EMBED_ORIGINS: 'https://asso.example, http://localhost:8000' })
+        .embed,
+    ).toEqual({ origins: ['https://asso.example', 'http://localhost:8000'] })
+    expect(readConfig(guests).embed).toBeUndefined()
+    expect(() => readConfig({ ...guests, WICA_EMBED_ORIGINS: 'https://asso.example/' })).toThrow(
+      /WICA_EMBED_ORIGINS/,
+    )
+    expect(() => readConfig({ ...base, WICA_EMBED_ORIGINS: 'https://asso.example' })).toThrow(
+      /WICA_GUESTS/,
+    )
+  })
 })
 
 describe('model of a conversation', () => {

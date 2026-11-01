@@ -41,10 +41,22 @@ export type HubConfig = {
    * absent when the instance does not accept guests.
    */
   guests?: { dailyLimit: number }
+  /** Sites whose pages may hold the guest chat component, by origin; absent, none may. */
+  embed?: { origins: string[] }
 }
 
 /** Messages a guest may send each day when the instance does not set its own number. */
 export const GUEST_DAILY_LIMIT = 20
+
+/** A scheme, a host and an optional port, as a browser sends in `Origin`. */
+function isOrigin(text: string) {
+  try {
+    const url = new URL(text)
+    return (url.protocol === 'https:' || url.protocol === 'http:') && url.origin === text
+  } catch {
+    return false
+  }
+}
 
 export class ConfigError extends Error {
   override name = 'ConfigError'
@@ -111,6 +123,20 @@ export function readConfig(env: Env, target: 'node' | 'workers' = 'node'): HubCo
   if (!Number.isInteger(dailyLimit) || dailyLimit < 1) {
     throw new ConfigError('WICA_GUEST_DAILY_LIMIT is a whole number of messages, 1 or more.')
   }
+  const embedOrigins = (optional(env, 'WICA_EMBED_ORIGINS') ?? '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
+  if (embedOrigins.length > 0 && !guests) {
+    throw new ConfigError('WICA_EMBED_ORIGINS needs WICA_GUESTS: the component is a guest chat.')
+  }
+  for (const origin of embedOrigins) {
+    if (!isOrigin(origin)) {
+      throw new ConfigError(
+        `WICA_EMBED_ORIGINS holds origins such as https://example.org, separated by commas; "${origin}" is not one.`,
+      )
+    }
+  }
   const electricSecret = optional(env, 'ELECTRIC_SECRET')
   const adminToken = optional(env, 'WICA_ADMIN_TOKEN')
   const storage: StorageConfig =
@@ -133,6 +159,7 @@ export function readConfig(env: Env, target: 'node' | 'workers' = 'node'): HubCo
     auth,
     testModels: testModels === '1',
     ...(guests ? { guests: { dailyLimit } } : {}),
+    ...(embedOrigins.length > 0 ? { embed: { origins: embedOrigins } } : {}),
     ...(adminToken ? { adminToken } : {}),
     ...(modelUrl && modelId
       ? { model: { url: modelUrl, id: modelId, ...(modelKey ? { apiKey: modelKey } : {}) } }

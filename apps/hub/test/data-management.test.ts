@@ -10,6 +10,7 @@ import { d1Guests } from '../src/server/d1/guests.ts'
 import { D1SessionStore } from '../src/server/d1/sessions.ts'
 import type { ConversationHost } from '../src/server/data.ts'
 import { sessionCookie } from '../src/server/identity.ts'
+import { resumableSession } from '../src/server/turns.ts'
 import { d1Database, migrateD1 } from './sqlite.ts'
 
 const origin = 'https://hub.test'
@@ -197,6 +198,27 @@ describe('guest sessions', () => {
     } as const
     await sessions.put(session)
     expect(await sessions.get('s1')).toEqual(session)
+  })
+
+  // A tab keeps its harness session across a sign-in: the account must not resume the guest's
+  // session, whose identity the harness would keep, and which may not reach the account's
+  // conversations.
+  it('are resumed only by the same person', async () => {
+    const d1 = d1Database()
+    await migrateD1(d1, new URL('../migrations/d1/', import.meta.url))
+    const sessions = new D1SessionStore(drizzle(d1 as never))
+    const guest = 'guest:01a19833-de63-783a-ac41-972ed56b49bc'
+    await sessions.put({
+      id: 's1',
+      identity: { userId: guest },
+      from: { channel: 'web', author: guest, trust: 'owner' },
+      expiresAt: Date.now() + 60_000,
+    })
+    expect(await resumableSession(sessions, 's1', guest)).toBe('s1')
+    expect(await resumableSession(sessions, 's1', '01a19837-5574-708b-bf43-d6b014c009f9')).toBe(
+      undefined,
+    )
+    expect(await resumableSession(sessions, 'unknown', guest)).toBe(undefined)
   })
 })
 

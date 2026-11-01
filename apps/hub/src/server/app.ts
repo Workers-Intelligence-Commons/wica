@@ -7,6 +7,7 @@ import type { Envelope } from '@wica/protocol'
 import { addressProblem } from './addresses.ts'
 import type { HubConfig } from './config.ts'
 import { randomToken, sha256Hex, sign, verify } from './crypto.ts'
+import { embedding } from './embed/index.ts'
 import {
   type Accounts,
   ADMIN_ROLE,
@@ -161,6 +162,7 @@ const API_KEY_SCOPE = 'chat'
 export function hubServer(config: HubConfig, data: HubData, platform: Platform) {
   const { accounts: repo, index, host, tokens, prompts } = data
   const mcp = data.mcpAccess
+  const embed = embedding(config, { sync: platform.live ? 'socket' : 'shapes' })
 
   const accounts =
     config.auth.kind === 'accounts'
@@ -499,6 +501,11 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
     if (parts[0] === 'auth') return authRoute(req, parts.slice(1).join('/'))
     if (parts[0] !== 'api') return null
     const [, section, ...rest] = parts
+    return embed.serve(req, section, (r) => apiRoute(r, section, rest))
+  }
+
+  async function apiRoute(req: Request, section: string | undefined, rest: string[]) {
+    if (section === 'embed' && req.method === 'GET') return embed.info()
     const principal = await principalOf(req)
     if (!principal) return guestRoute(req, section, rest)
     if (section === 'admin') {
@@ -590,7 +597,27 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
     if (section === 'commands' && req.method === 'POST') return command(req, owner)
     if (section === 'conversations') return conversationsRoute(req, owner, rest)
     if (section === 'models' && req.method === 'GET') return json(guestModels())
+    if (section === 'guest' && rest[0] === 'merge' && req.method === 'POST') {
+      return mergeGuest(req, guestId)
+    }
     return error(401, 'authentication required')
+  }
+
+  /**
+   * Another guest key, handed over from the component on another site, gives its conversations
+   * to this one and is gone; its secret proves that the browser holds it.
+   */
+  async function mergeGuest(req: Request, guestId: string) {
+    const body = (await req.json().catch(() => ({}))) as { key?: unknown }
+    const [id, secret] = typeof body.key === 'string' ? body.key.split('.') : []
+    if (!id || !secret || !(await data.guests.verify(id, await sha256Hex(secret)))) {
+      return error(404, 'guest key not found')
+    }
+    if (id !== guestId) {
+      await index.claim(id, { kind: 'guest', id: guestId })
+      await data.guests.delete(id)
+    }
+    return new Response(null, { status: 204 })
   }
 
   /** The guest's conversations become the account's, and the guest key is gone. */
@@ -598,7 +625,7 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
     if (principal.kind !== 'user') return error(403, 'a browser session was expected')
     const guestId = await guestOf(req)
     if (!guestId) return error(404, 'guest key not found')
-    await index.claim(guestId, principal.id)
+    await index.claim(guestId, { kind: 'user', id: principal.id })
     await data.guests.delete(guestId)
     return new Response(null, { status: 204 })
   }

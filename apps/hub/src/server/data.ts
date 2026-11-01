@@ -131,8 +131,8 @@ export interface ConversationIndex {
   list(owner: Owner): Promise<ConversationRow[]>
   /** Conversations of guests that no one has changed since `before` (ISO time). */
   guestsIdleSince(before: string): Promise<string[]>
-  /** Hands every conversation of the guest to the account. */
-  claim(guestId: string, userId: string): Promise<void>
+  /** Hands every conversation of the guest to an account, or to another guest key. */
+  claim(guestId: string, to: Owner): Promise<void>
   delete(conversationId: string): Promise<void>
 }
 

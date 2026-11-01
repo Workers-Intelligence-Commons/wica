@@ -29,3 +29,6 @@ export type ConsentId = (typeof CONSENT_KINDS)[number]['id']
 /** The kinds that concern this audience. */
 export const consentKindsFor = (audience: ConsentAudience): readonly ConsentKind[] =>
   CONSENT_KINDS.filter((kind) => (kind.audience as readonly ConsentAudience[]).includes(audience))
+
+export const isConsentId = (value: string): value is ConsentId =>
+  CONSENT_KINDS.some((kind) => kind.id === value)
