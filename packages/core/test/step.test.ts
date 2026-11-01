@@ -261,6 +261,32 @@ describe('settled', () => {
     expect(now()).toBe(true)
   })
 
+  it('keeps the error of a model that fails before any text, and stays at rest', () => {
+    const h = host()
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Hi' }] })
+    h.send({ t: 'resume' })
+    h.send({ t: 'model_failed', error: '404: no endpoint' })
+    expect(journal(h.state).at(-1)).toMatchObject({
+      kind: 'event',
+      name: 'model_failed',
+      data: { error: '404: no endpoint' },
+    })
+    expect(settled(h.state.items, h.state.head)).toBe(true)
+    expect(kinds(h.send({ t: 'resume' }))).toEqual([])
+    expect(journalViolations(h.state.items)).toEqual([])
+  })
+
+  it('keeps the text received before a model failure, marked as failed', () => {
+    const h = host()
+    h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Hi' }] })
+    h.send({ t: 'resume' })
+    h.send({ t: 'model_delta', delta: { type: 'text', text: 'Hel' } })
+    h.send({ t: 'model_failed', error: 'connection reset' })
+    const path = journal(h.state)
+    expect(path.at(-2)).toMatchObject({ kind: 'assistant_text', text: 'Hel', status: 'failed' })
+    expect(path.at(-1)).toMatchObject({ kind: 'event', name: 'model_failed' })
+  })
+
   it('is at rest after an interruption, which closes the open calls', () => {
     const h = host()
     h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Read' }] })

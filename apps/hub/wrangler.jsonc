@@ -1,0 +1,25 @@
+// Deployment on Cloudflare Workers: D1 holds accounts, keys, model tokens and the list of
+// conversations; each conversation has its own Durable Object, with its SQLite database.
+// The D1 migrations are applied by `wrangler d1 migrations apply DB`.
+// The settings read by `src/server/config.ts` are Worker variables and secrets; Workers reads
+// neither DATABASE_URL nor ELECTRIC_URL.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wica-hub",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./src/server.ts",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "wica-hub",
+      "database_id": "<D1 database identifier>",
+      "migrations_dir": "migrations/d1",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "CONVERSATIONS", "class_name": "ConversationObject" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ConversationObject"] }],
+  "limits": { "cpu_ms": 300000 },
+}

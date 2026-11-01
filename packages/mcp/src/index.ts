@@ -32,9 +32,13 @@ export type McpServerConfig = {
   deny?: string[]
 }
 
+type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
+
 export type McpOptions = {
   /** Identity announced to the servers. */
   clientInfo?: { name: string; version: string }
+  /** Base `fetch` of the HTTP connections; the host may restrict the addresses it reaches. */
+  fetch?: Fetch
 }
 
 /** Default values of the annotations in the MCP specification. */
@@ -117,8 +121,6 @@ export async function toParts(result: {
   return parts
 }
 
-type Fetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>
-
 /**
  * Requests to an MCP server with its token. A `401` refusal makes the token refresh once, under
  * the mutual exclusion of the `CredentialStore`, then replays the request.
@@ -177,7 +179,11 @@ class Connection {
     if (!this.config.url)
       throw new McpConnectionError(`MCP server ${this.config.name} has no address`)
     return new StreamableHTTPClientTransport(new URL(this.config.url), {
-      fetch: authorizedFetch(fetch, this.config.credential, this.config.headers),
+      fetch: authorizedFetch(
+        this.#options.fetch ?? fetch,
+        this.config.credential,
+        this.config.headers,
+      ),
     })
   }
 

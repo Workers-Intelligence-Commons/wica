@@ -227,6 +227,7 @@ function answerTrigger(path: readonly ItemDraft[]): ItemDraft | undefined {
     (i) =>
       i.kind !== 'event' ||
       i.name === 'interrupted' ||
+      i.name === 'model_failed' ||
       i.name === 'regenerate' ||
       i.name === 'wakeup_fired',
   )
@@ -691,6 +692,28 @@ function toolResult(s: State, e: Extract<EventBody, { t: 'tool_result' }>, at: s
   return append(s, [item, ...closing], [])
 }
 
+/**
+ * The text already received stays, marked as failed. The marker keeps the error in the journal,
+ * even when the failure comes before any text, and puts the conversation at rest.
+ */
+function modelFailed(s: State, error: string, at: string): Step {
+  const closed = closeStream(s, 'failed')
+  const parent = closed.state.head
+  const marker = draft(
+    serverItemId({
+      conversationId: s.conversationId,
+      parentId: parent,
+      trigger: `failed:${at}`,
+      rank: 0,
+    }),
+    parent,
+    at,
+    'done',
+    { kind: 'event', name: 'model_failed', data: { error } },
+  )
+  return append(closed.state, [marker], closed.intents)
+}
+
 function interrupt(s: State, at: string): Step {
   const closed = closeStream(s, 'interrupted')
   let state = closed.state
@@ -811,8 +834,7 @@ export function step(state: State, event: Event): Step {
     case 'model_done':
       return modelDone(state, event.message, event.at)
     case 'model_failed':
-      // The text already received stays, marked as failed; nothing restarts the model in this turn.
-      return closeStream(state, 'failed')
+      return modelFailed(state, event.error, event.at)
     case 'tool_result':
       return toolResult(state, event, event.at)
     case 'tools_changed':

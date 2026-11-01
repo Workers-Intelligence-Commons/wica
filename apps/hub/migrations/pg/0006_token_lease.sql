@@ -1,0 +1,1 @@
+ALTER TABLE "model_credentials" ADD COLUMN "refreshing_until" bigint;

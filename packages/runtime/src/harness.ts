@@ -142,6 +142,8 @@ export type HarnessOptions = {
   clientToolTimeoutMs?: number
   /** An approval, a question or the end of a task waits for a person. */
   onAttentionNeeded?: (conversationId: string, attention: Attention) => void
+  /** A turn failed: its model request, or the host (Store, transport) during the turn. */
+  onTurnFailed?: (conversationId: string, message: string) => void
 }
 
 type Sink = (frame: ServerFrame) => void
@@ -294,6 +296,7 @@ export function createHarness(options: HarnessOptions) {
 
   const fail = (conversationId: string, error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)
+    options.onTurnFailed?.(conversationId, message)
     broadcast(
       conversationId,
       { kind: 'error', conversationId, message },

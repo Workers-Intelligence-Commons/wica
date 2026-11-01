@@ -7,7 +7,11 @@ export default defineConfig({
     plugins: ['typescript'],
     options: { typeAware: true, typeCheck: true },
   },
-  fmt: { singleQuote: true, semi: false, ignorePatterns: ['**/routeTree.gen.ts', 'vendor/**'] },
+  fmt: {
+    singleQuote: true,
+    semi: false,
+    ignorePatterns: ['**/routeTree.gen.ts', 'vendor/**', 'apps/*/migrations/**'],
+  },
   test: {
     include: ['packages/*/test/**/*.test.ts', 'apps/*/test/**/*.test.ts'],
   },

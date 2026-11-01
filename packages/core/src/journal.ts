@@ -18,6 +18,8 @@ export type ItemStatus = 'streaming' | 'done' | 'interrupted' | 'failed'
 
 export type EventName =
   | 'interrupted'
+  /** The model request failed (`data: { error }`); nothing restarts the model on its own. */
+  | 'model_failed'
   | 'compacted'
   | 'approval'
   | 'tools_changed'

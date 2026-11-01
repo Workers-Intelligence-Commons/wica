@@ -43,6 +43,8 @@ export type ViewEntry =
       result?: Extract<Item, { kind: 'tool_result' }>
       approval: boolean
     }
+  /** The model request failed; `message` is the provider's error. */
+  | { type: 'failure'; item: Extract<Item, { kind: 'event' }>; message: string }
 
 export type ConversationView = {
   head: string | null
@@ -105,7 +107,14 @@ export function deriveView(
   const entries: ViewEntry[] = []
   for (const item of path) {
     if (item.kind === 'user_message') entries.push({ type: 'user', item })
-    else if (item.kind === 'assistant_text') {
+    else if (item.kind === 'event' && item.name === 'model_failed') {
+      const { error } = (item.data ?? {}) as { error?: unknown }
+      entries.push({
+        type: 'failure',
+        item,
+        message: typeof error === 'string' ? error : 'The model request failed.',
+      })
+    } else if (item.kind === 'assistant_text') {
       if (item.audience !== 'user' && item.status !== 'streaming') continue
       const streaming = item.status === 'streaming'
       entries.push({
