@@ -15,6 +15,7 @@ import { pgSignInPrompts } from '../server/pg/prompts.ts'
 import { PgSessionStore } from '../server/pg/sessions.ts'
 import { pgSkills } from '../server/pg/skills.ts'
 import { PgStore } from '../server/pg/store.ts'
+import { pgGuests } from '../server/pg/guests.ts'
 import { pgModelCalls } from '../server/pg/model-calls.ts'
 import { pgTokenRows } from '../server/pg/tokens.ts'
 import { modelTokens } from '../server/tokens.ts'
@@ -56,5 +57,6 @@ export function pgHubData(
     mcp,
     mcpAccess: access,
     skills,
+    guests: pgGuests(db),
   }
 }

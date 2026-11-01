@@ -91,7 +91,9 @@ export function betterAuthConnector(
         subject: found.user.id,
         name: found.user.name,
       })
-      return repo.principal(userId)
+      const principal = await repo.principal(userId)
+      // A Better Auth session is created at sign-in and keeps that time while it is renewed.
+      return principal && { ...principal, signedInAt: new Date(found.session.createdAt).getTime() }
     },
   }
 
@@ -105,7 +107,14 @@ export function betterAuthConnector(
     await context.internalAdapter.deleteUserSessions(subject)
   }
 
-  return { handle: (req: Request) => auth.handler(req), provider, resetPassword }
+  /** Deletes the Better Auth user `subject`, with its sessions and its password. */
+  async function deleteUser(subject: string) {
+    const context = await auth.$context
+    await context.internalAdapter.deleteUserSessions(subject)
+    await context.internalAdapter.deleteUser(subject)
+  }
+
+  return { handle: (req: Request) => auth.handler(req), provider, resetPassword, deleteUser }
 }
 
 export type BetterAuthConnector = ReturnType<typeof betterAuthConnector>

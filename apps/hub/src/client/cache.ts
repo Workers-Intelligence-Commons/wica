@@ -18,7 +18,9 @@ const ACCOUNT_KEY = `${PREFIX}-account`
  * identifier.
  */
 export const cacheName = (account: string, conversation?: string) =>
-  conversation ? `${FILE_PREFIX}c-${conversation}` : `${FILE_PREFIX}a-${account}`
+  conversation
+    ? `${FILE_PREFIX}c-${conversation}`
+    : `${FILE_PREFIX}a-${account.replace(/[^a-z0-9-]/gi, '-')}`
 
 /** Conversations to evict: the oldest opened beyond the quota, never a pending one. */
 export function evictionPlan(

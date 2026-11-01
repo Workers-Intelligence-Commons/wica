@@ -1,5 +1,5 @@
-// Compose platform: a single Node process, a shared Postgres pool, and the scheduler loop, which
-// reads `wakeups` and starts turns in this process.
+// Compose platform: a single Node process, a shared Postgres pool, the scheduler loop, which
+// reads `wakeups` and starts turns in this process, and the hourly purge of the trash.
 
 import postgres from 'postgres'
 
@@ -9,6 +9,9 @@ import { pgDatabase } from '../server/pg/db.ts'
 import { pgScheduler } from '../server/pg/scheduler.ts'
 import { pgHubData } from './pg.ts'
 import { electricRows } from './electric.ts'
+
+/** How often the trash and the idle guest conversations are emptied. */
+const PURGE_EVERY_MS = 60 * 60_000
 
 let instance: { hub: HubServer; startLoop: () => () => void } | null = null
 
@@ -22,7 +25,19 @@ function shared() {
       clientAddress: (req) => req.headers.get('x-wica-client-address') ?? undefined,
       rows: electricRows(config.storage),
     })
-    instance = { hub, startLoop: () => scheduler.run((id) => data.host.wake(id)) }
+    instance = {
+      hub,
+      startLoop: () => {
+        const stopWakeups = scheduler.run((id) => data.host.wake(id))
+        const purge = () => void hub.purge().catch((e) => console.error('purge failed:', e))
+        purge()
+        const timer = setInterval(purge, PURGE_EVERY_MS)
+        return () => {
+          clearInterval(timer)
+          stopWakeups()
+        }
+      },
+    }
   }
   return instance
 }
@@ -39,3 +54,6 @@ export function startBackground() {
 
 /** Workers only. */
 export const ConversationObject = undefined
+
+/** Workers only: Compose purges from its own loop. */
+export const scheduled = undefined

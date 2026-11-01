@@ -3,7 +3,7 @@
 // Workers one; Workers also finds the conversation Durable Object class here.
 
 import handler, { createServerEntry } from '@tanstack/react-start/server-entry'
-import { startBackground, withHub } from '#platform'
+import { scheduled, startBackground, withHub } from '#platform'
 
 import { withScope } from './server/context.ts'
 
@@ -21,6 +21,7 @@ const entry = createServerEntry({
 export default {
   ...entry,
   ...(startBackground !== undefined ? { startBackground } : {}),
+  ...(scheduled !== undefined ? { scheduled } : {}),
 }
 
 export { ConversationObject } from '#platform'

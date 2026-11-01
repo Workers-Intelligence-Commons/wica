@@ -16,7 +16,8 @@ import { TopBar } from '../../ui/TopBar.tsx'
 
 export const Route = createFileRoute('/_app/admin')({
   beforeLoad: ({ context }) => {
-    if (!context.me.admin) throw redirect({ to: '/' })
+    if (!context.me?.admin) throw redirect({ to: '/' })
+    return { me: context.me }
   },
   component: Admin,
 })

@@ -17,7 +17,7 @@ describe('contributing conversations to the commons', () => {
     const accounts = new D1Accounts(db)
     const index = d1ConversationIndex(db)
     const ada = await accounts.link({ provider: 'better-auth', subject: 's1', name: 'Ada' })
-    const { id } = await index.create({ ownerId: ada, title: '', model: null })
+    const { id } = await index.create({ owner: { kind: 'user', id: ada }, title: '', model: null })
     const stamp = async () => {
       const [row] = await db
         .select({ at: conversations.contributedAt })

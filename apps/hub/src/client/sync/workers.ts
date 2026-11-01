@@ -4,6 +4,7 @@
 
 import type { ChunkRow, ConversationRow, ItemShapeRow, ModelCallRow } from '../../shared/rows.ts'
 import { type LiveFrame, livePath } from '../../shared/live.ts'
+import { apiFetch, guestKey } from '../guest.ts'
 
 export const LIST_REFRESH_MS = 30_000
 const FIRST_RETRY_MS = 200
@@ -80,8 +81,23 @@ class LiveConversation {
   }
 
   #open() {
+    void this.#connect()
+  }
+
+  async #connect() {
     const url = new URL(livePath(this.conversationId), location.href)
     url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    // A browser socket carries no header: a guest opens it with a short ticket.
+    if (guestKey()) {
+      const response = await apiFetch(
+        `/api/live-ticket/${encodeURIComponent(this.conversationId)}`,
+        { method: 'POST' },
+      ).catch(() => null)
+      if (response?.ok) {
+        url.searchParams.set('ticket', ((await response.json()) as { ticket: string }).ticket)
+      }
+      if (this.#socket || this.#users === 0) return
+    }
     const socket = new WebSocket(url)
     this.#socket = socket
     socket.onopen = () => (this.#retry = FIRST_RETRY_MS)
@@ -272,7 +288,9 @@ const list = {
 }
 
 async function fetchList(): Promise<ConversationRow[]> {
-  const response = await fetch('/api/conversations', { headers: { accept: 'application/json' } })
+  const response = await apiFetch('/api/conversations', {
+    headers: { accept: 'application/json' },
+  })
   if (!response.ok) throw new Error(`conversation list unavailable (${response.status})`)
   return (await response.json()) as ConversationRow[]
 }

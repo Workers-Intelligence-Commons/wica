@@ -78,6 +78,8 @@ export const apiKeys = pgTable(
   {
     id: uuid('id').primaryKey(),
     keyHash: text('key_hash').notNull().unique(),
+    /** Given by its owner to tell their keys apart; empty without one. */
+    name: text('name').notNull().default(''),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
     organizationId: uuid('organization_id').references(() => organizations.id, {
       onDelete: 'cascade',
@@ -127,10 +129,20 @@ export const conversations = pgTable(
      * while its owner contributes, and never cleared, since the dedication cannot be withdrawn.
      */
     contributedAt: at('contributed_at'),
+    /** When it was put in the trash; erased `TRASH_MS` later unless restored. */
+    deletedAt: at('deleted_at'),
+    /**
+     * The guest key (`guests`) that started it, while no account owns it; the owner is then
+     * null. Moved to the account when the guest signs in.
+     */
+    guestId: uuid('guest_id'),
     createdAt: createdAt(),
     updatedAt: at('updated_at').notNull().defaultNow(),
   },
-  (t) => [index('conversations_owner').on(t.ownerId, t.updatedAt.desc())],
+  (t) => [
+    index('conversations_owner').on(t.ownerId, t.updatedAt.desc()),
+    index('conversations_guest').on(t.guestId),
+  ],
 )
 
 /**
@@ -471,4 +483,42 @@ export const skills = pgTable(
       .on(t.name)
       .where(sql`${t.visibility} = 'instance'`),
   ],
+)
+
+/**
+ * Guest keys: a person without an account keeps the key in their browser and sends it with each
+ * request; only the hash of its secret is stored.
+ */
+export const guests = pgTable('guests', {
+  id: uuid('id').primaryKey(),
+  secretHash: text('secret_hash').notNull(),
+  createdAt: createdAt(),
+})
+
+/**
+ * Messages sent by guests per UTC day, counted under each key that limits them: the guest key
+ * (`g:` and its id) and the fingerprint of the browser and its network (`f:` and its hash).
+ */
+export const guestUsage = pgTable(
+  'guest_usage',
+  {
+    key: text('key').notNull(),
+    day: text('day').notNull(),
+    count: integer('count').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.key, t.day] })],
+)
+
+/** The answer of an account for each kind of consent (`shared/consent.ts`). */
+export const consents = pgTable(
+  'consents',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    granted: boolean('granted').notNull(),
+    at: at('at').notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.kind] })],
 )

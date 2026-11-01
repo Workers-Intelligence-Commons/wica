@@ -8,6 +8,7 @@ import { type Part, type ReasoningLevel, userMessageId } from '@wica/core'
 import type { Command, Envelope } from '@wica/protocol'
 
 import { markPending } from './cache.ts'
+import { apiFetch } from './guest.ts'
 import type { ItemShapeRow } from '../shared/rows.ts'
 import { refreshList, rowConfirmation } from './sync/index.ts'
 
@@ -61,7 +62,7 @@ export function envelope(
 export async function postCommand(env: Envelope): Promise<{ ok: true }> {
   tab ??= tabState()
   const harness = tab.harnessSession()
-  const response = await fetch('/api/commands', {
+  const response = await apiFetch('/api/commands', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',

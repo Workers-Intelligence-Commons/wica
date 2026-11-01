@@ -13,6 +13,7 @@ import { conversationsCollection, itemsCollection } from '../../client/collectio
 import { sendMessage } from '../../client/commands.ts'
 import { awaitCreated } from '../../client/sync/index.ts'
 import { prepareCache } from '../../client/dependencies.ts'
+import { apiFetch } from '../../client/guest.ts'
 import {
   keptLevel,
   levelsOf,
@@ -21,11 +22,12 @@ import {
   useModels,
 } from '../../ui/ModelPicker.tsx'
 import { TopBar } from '../../ui/TopBar.tsx'
+import { useViewer } from '../_app.tsx'
 
 export const Route = createFileRoute('/_app/')({ component: NewConversation })
 
 function NewConversation() {
-  const { me } = Route.useRouteContext()
+  const viewer = useViewer()
   const db = useDbClient()
   const navigate = useNavigate()
   const models = useModels()
@@ -42,7 +44,7 @@ function NewConversation() {
 
   async function start(text: string) {
     setFailed(null)
-    const response = await fetch('/api/conversations', {
+    const response = await apiFetch('/api/conversations', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ model: model || null }),
@@ -53,12 +55,12 @@ function NewConversation() {
     }
     const created = (await response.json()) as { id: string; salt: string; txid?: number }
     await awaitCreated(db.collection(conversationsCollection), created, 15_000)
-    await touchConversation(me.id, created.id)
-    await prepareCache(cacheName(me.id, created.id))
+    await touchConversation(viewer.id, created.id)
+    await prepareCache(cacheName(viewer.id, created.id))
     const items = db.collection(itemsCollection(created.id))
     void sendMessage({
       items,
-      account: me.id,
+      account: viewer.id,
       conversationId: created.id,
       salt: created.salt,
       parentId: null,

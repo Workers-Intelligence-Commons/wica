@@ -5,7 +5,7 @@ import { proxiedResponse, shapeSpec, upstreamUrl } from '../src/platform/electri
 describe('shape proxy', () => {
   // The client must never choose what it reads: the shape comes from the server, for the account of the request.
   it('ignores the table, filter and columns of the client and adds the secret', () => {
-    const spec = shapeSpec('items', { owner: 'u1', conversationId: 'c1' })
+    const spec = shapeSpec('items', { owner: { kind: 'user', id: 'u1' }, conversationId: 'c1' })
     if (!spec) throw new Error('shape expected')
     const client = new URL(
       'https://hub.test/api/shapes/items?offset=5_2&handle=h1&live=true&table=users&where=true&columns=*&params[1]=c2&secret=x&subset__where=1',
@@ -25,7 +25,7 @@ describe('shape proxy', () => {
   })
 
   it('serves no conversation shape without a verified conversation', () => {
-    expect(shapeSpec('items', { owner: 'u1' })).toBeNull()
+    expect(shapeSpec('items', { owner: { kind: 'user', id: 'u1' } })).toBeNull()
   })
 
   // A shared cache must not serve one person's shape to another again.
@@ -35,7 +35,7 @@ describe('shape proxy', () => {
       headers: { 'content-encoding': 'gzip', 'content-length': '2', 'electric-handle': 'h1' },
     })
     const response = proxiedResponse(upstream)
-    expect(response.headers.get('vary')).toBe('Cookie, Authorization')
+    expect(response.headers.get('vary')).toBe('Cookie, Authorization, X-Wica-Guest')
     expect(response.headers.get('content-encoding')).toBeNull()
     expect(response.headers.get('electric-handle')).toBe('h1')
     expect(await response.text()).toBe('[]')

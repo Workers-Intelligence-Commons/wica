@@ -5,6 +5,7 @@ import type { Session, SessionStore } from '@wica/runtime'
 import { and, eq, sql } from 'drizzle-orm'
 
 import type { D1Db } from './accounts.ts'
+import { accountOf } from '../data.ts'
 import { sessionCommands, sessions } from './schema.ts'
 
 export class D1SessionStore implements SessionStore {
@@ -28,7 +29,7 @@ export class D1SessionStore implements SessionStore {
     const identity = session.identity as { userId?: string } | null
     await this.#db
       .insert(sessions)
-      .values({ id: session.id, userId: identity?.userId ?? null, state, expiresAt })
+      .values({ id: session.id, userId: accountOf(identity?.userId), state, expiresAt })
       .onConflictDoUpdate({
         target: sessions.id,
         set: { state, expiresAt, lastSeenAt: new Date().toISOString() },

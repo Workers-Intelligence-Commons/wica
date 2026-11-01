@@ -32,8 +32,8 @@ export function shapeSpec(name: SyncTable, scope: SyncScope): ShapeSpec | null {
     case 'conversations':
       return {
         table: 'conversations',
-        where: 'owner_id = $1',
-        params: [scope.owner],
+        where: scope.owner.kind === 'user' ? 'owner_id = $1' : 'owner_id IS NULL AND guest_id = $1',
+        params: [scope.owner.id],
         columns: [
           'id',
           'owner_id',
@@ -44,6 +44,8 @@ export function shapeSpec(name: SyncTable, scope: SyncScope): ShapeSpec | null {
           'model',
           'head_item_id',
           'id_salt',
+          'contributed_at',
+          'deleted_at',
           'created_at',
           'updated_at',
         ],
@@ -119,7 +121,7 @@ export function proxiedResponse(upstream: Response): Response {
   const headers = new Headers(upstream.headers)
   headers.delete('content-encoding')
   headers.delete('content-length')
-  headers.set('vary', 'Cookie, Authorization')
+  headers.set('vary', 'Cookie, Authorization, X-Wica-Guest')
   return new Response(upstream.body, {
     status: upstream.status,
     statusText: upstream.statusText,

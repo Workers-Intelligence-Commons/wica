@@ -22,20 +22,55 @@ export interface Accounts extends IdentityRepo {
   organizations(userId: string): Promise<{ id: string; name: string }[]>
   /** Subject of the account's identity at `provider`; `null` without one. */
   subject(userId: string, provider: string): Promise<string | null>
-  /** Creates an API key; the token is returned only here, storage keeps only its hash. */
+  /**
+   * Creates an API key, named by its owner (empty: no name); the token is returned only here,
+   * storage keeps only its hash.
+   */
   createApiKey(
     owner: { userId: string } | { organizationId: string },
     scopes: string[],
+    name?: string,
   ): Promise<string>
   /** Keys of the account that are not revoked, oldest first; never their token. */
-  apiKeys(userId: string): Promise<{ id: string; createdAt: string }[]>
+  apiKeys(userId: string): Promise<{ id: string; name: string; createdAt: string }[]>
+  /** Renames a key of the account; false when the account has no such key. */
+  renameApiKey(userId: string, id: string, name: string): Promise<boolean>
   /** Revokes a key of the account; false when the account has no such key. */
   revokeApiKey(userId: string, id: string): Promise<boolean>
   /** Display name of the account; `null` when it does not exist. */
   displayName(userId: string): Promise<string | null>
+  rename(userId: string, name: string): Promise<void>
+  /**
+   * Deletes the account with everything that belongs to it in this storage: identities,
+   * memberships, keys, model tokens, tool servers and skills. Conversations still owned go with
+   * it; the caller first erases or hands over each one.
+   */
+  deleteAccount(userId: string): Promise<void>
   /** Whether the account gives its conversations to the commons from now on. */
   contributor(userId: string): Promise<boolean>
   setContributor(userId: string, on: boolean): Promise<void>
+  /** The account's answer to each kind of consent it has answered. */
+  consents(userId: string): Promise<{ kind: string; granted: boolean; at: string }[]>
+  setConsent(userId: string, kind: string, granted: boolean): Promise<void>
+}
+
+/** Guest keys, and the messages guests send per day under each key that limits them. */
+export interface Guests {
+  /** Creates a key whose secret has this hash; returns its identifier. */
+  create(secretHash: string): Promise<string>
+  /** The key exists and its secret has this hash. */
+  verify(id: string, secretHash: string): Promise<boolean>
+  delete(id: string): Promise<void>
+  /**
+   * Counts one message under each key for `day` (UTC, `YYYY-MM-DD`), unless one of them already
+   * holds `limit`: nothing is counted then, and the answer is false.
+   */
+  count(keys: string[], day: string, limit: number): Promise<boolean>
+  /**
+   * Deletes the keys created before `before` (ISO time) that no conversation uses any more, and
+   * the counts of the days before `beforeDay`.
+   */
+  prune(before: string, beforeDay: string): Promise<void>
 }
 
 export type ConversationEntry = {
@@ -44,7 +79,23 @@ export type ConversationEntry = {
   model: string | null
   /** Salt of the item identifiers. */
   salt: string
+  /** In the trash: read-only until restored, erased after `TRASH_MS`. */
+  trashed: boolean
+  /** Given to the commons under CC0. */
+  contributed: boolean
+  /** The guest key that owns it while no account does. */
+  guestId: string | null
 }
+
+/** Who a conversation belongs to: an account, or a guest key while it has none. */
+export type Owner = { kind: 'user'; id: string } | { kind: 'guest'; id: string }
+
+/** The account behind a harness identity's `userId`; `null` for a guest (`guest:<key>`). */
+export const accountOf = (userId: string | undefined) =>
+  userId && !userId.startsWith('guest:') ? userId : null
+
+/** How long a conversation stays in the trash before it is erased. */
+export const TRASH_MS = 30 * 24 * 60 * 60_000
 
 /** The list of conversations: who owns each one, its title and its model. */
 export interface ConversationIndex {
@@ -53,19 +104,35 @@ export interface ConversationIndex {
    * that confirms by transaction.
    */
   create(input: {
-    ownerId: string
+    owner: Owner
     title: string
     model: string | null
   }): Promise<{ id: string; salt: string; txid?: number }>
   get(conversationId: string): Promise<ConversationEntry | null>
   /** Sets the title only while it is empty. */
   setTitleIfEmpty(conversationId: string, title: string): Promise<void>
+  setTitle(conversationId: string, title: string): Promise<void>
+  /** Puts the conversation in the trash, from now. */
+  trash(conversationId: string): Promise<void>
+  /** Takes the conversation out of the trash. */
+  restore(conversationId: string): Promise<void>
+  /**
+   * Leaves the conversation to the commons: it no longer has an owner, and so leaves the owner's
+   * list and their export, while its journal stays.
+   */
+  giveToCommons(conversationId: string): Promise<void>
+  /** Conversations put in the trash before `before` (ISO time). */
+  trashedBefore(before: string): Promise<string[]>
   /** Sets the model of the next turns (`null`: the default model). */
   setModel(conversationId: string, model: string | null): Promise<void>
   /** Marks the conversation as given to the commons, once: a later call keeps the first time. */
   markContributed(conversationId: string): Promise<void>
-  /** Conversations of an account, most recently changed first. */
-  list(ownerId: string): Promise<ConversationRow[]>
+  /** Conversations of an account or a guest, the trash included, most recently changed first. */
+  list(owner: Owner): Promise<ConversationRow[]>
+  /** Conversations of guests that no one has changed since `before` (ISO time). */
+  guestsIdleSince(before: string): Promise<string[]>
+  /** Hands every conversation of the guest to the account. */
+  claim(guestId: string, userId: string): Promise<void>
   delete(conversationId: string): Promise<void>
 }
 
@@ -190,6 +257,8 @@ export interface McpServers {
   /** Connections of an account, in the order of their names. */
   connections(userId: string): Promise<McpConnection[]>
   connection(id: string): Promise<(McpConnection & { secret: SealedSecret | null }) | null>
+  /** False when the connection is not the account's; `name_taken` as for `connect`. */
+  rename(userId: string, id: string, name: string): Promise<boolean | 'name_taken'>
   /** `name_taken` when another connection of the account has the name. */
   connect(
     input: Omit<McpConnection, 'id'> & { secret: SealedSecret | null },
@@ -243,5 +312,10 @@ export interface Skills {
   get(id: string): Promise<SkillRecord | null>
   /** `name_taken` when another skill of the same visibility and owner has the name. */
   create(input: Omit<SkillRecord, 'id'>): Promise<SkillRecord | 'name_taken'>
+  /** Replaces the text of a skill; `name_taken` as for `create`. */
+  update(
+    id: string,
+    text: Pick<SkillRecord, 'name' | 'description' | 'body'>,
+  ): Promise<SkillRecord | 'name_taken'>
   delete(id: string): Promise<void>
 }

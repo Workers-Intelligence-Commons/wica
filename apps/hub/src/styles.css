@@ -543,3 +543,293 @@ pre {
     margin: var(--space-2) auto;
   }
 }
+
+/* Drawer: the search over the titles, each row's actions, and the way to every conversation. */
+.drawer-search {
+  margin: 0 var(--space-1) var(--space-3);
+  width: calc(100% - 2 * var(--space-1));
+}
+
+.drawer-empty,
+.manage-empty {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.drawer-all {
+  align-self: flex-start;
+  margin: var(--space-2) var(--space-1) 0;
+}
+
+.conv-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.conv-row > .wic-conversation-link {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* Shown on hover or focus of the row; always there on a touch screen, which has no hover. */
+.conv-more {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-muted);
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--motion-quick) ease;
+}
+
+.conv-row:hover .conv-more,
+.conv-row:focus-within .conv-more,
+.conv-more[aria-expanded='true'] {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .conv-more {
+    opacity: 1;
+  }
+}
+
+.conv-actions {
+  flex-basis: 100%;
+  display: flex;
+  gap: var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
+  animation: wic-paste var(--motion-paste) var(--ease-paste);
+}
+
+.conv-rename,
+.rename {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+}
+
+.conv-rename .wic-input,
+.rename .wic-input {
+  flex: 1 1 160px;
+}
+
+.conv-undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--line);
+  font-family: var(--font-serif);
+  font-style: italic;
+  animation: wic-paste var(--motion-paste) var(--ease-paste);
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+/* Every conversation and the trash. */
+.manage,
+.guest-gate {
+  overflow-y: auto;
+  padding: var(--space-8) var(--gutter);
+}
+
+.manage-tabs {
+  display: flex;
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.manage-tab {
+  padding: var(--space-2) 0;
+  border: 0;
+  border-bottom: 4px solid transparent;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-gothic);
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.manage-tab[aria-selected='true'] {
+  border-bottom-color: var(--ochre);
+}
+
+.manage-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.manage-bar > .wic-input {
+  flex: 1 1 220px;
+}
+
+.manage-all {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-gothic);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.manage-count {
+  min-width: 10ch;
+  color: var(--ink-muted);
+}
+
+.manage-failure {
+  white-space: pre-line;
+  padding: 0;
+}
+
+.manage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.manage-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.manage-title {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  font-family: var(--font-gothic);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.manage-title:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.manage-meta {
+  flex: none;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+/* A conversation in the trash: read-only until restored. */
+.trashed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-top: 4px solid var(--ochre);
+}
+
+.trashed p {
+  margin: 0;
+  font-family: var(--font-serif);
+}
+
+/* A guest's first visit: the consent before the chat. */
+.guest-gate > p {
+  max-width: 62ch;
+}
+
+.consent {
+  margin: var(--space-4) 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 4px solid var(--ochre);
+}
+
+.consent h3 {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-gothic);
+  font-size: 17px;
+}
+
+.consent p {
+  margin: 0 0 var(--space-3);
+  max-width: 62ch;
+}
+
+.consent-actions,
+.guest-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* Settings: a heading inside a section, forms on one line, and short lists. */
+.panel-sub {
+  margin: var(--space-6) 0 var(--space-2);
+  font-family: var(--font-gothic);
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.inline-form .wic-field {
+  flex: 1 1 240px;
+}
+
+.facts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.facts-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.skill-edit {
+  margin-bottom: var(--space-3);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conv-actions,
+  .conv-undo {
+    animation: none;
+  }
+
+  .conv-more {
+    transition: none;
+  }
+}

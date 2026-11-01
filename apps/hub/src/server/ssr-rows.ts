@@ -17,7 +17,7 @@ export async function serverRows(
   const { hub, req } = currentScope()
   const me = await hub.me(req)
   if (!me) return []
-  if (table === 'conversations') return hub.index.list(me.id)
+  if (table === 'conversations') return hub.index.list({ kind: 'user', id: me.id })
   if (!conversationId) return []
   const entry = await hub.index.get(conversationId)
   if (entry?.ownerId !== me.id) return []

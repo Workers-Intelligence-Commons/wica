@@ -9,7 +9,6 @@ import {
   oidcAuth,
   type Principal,
   sessionCookie,
-  trustedProxyAuth,
 } from '../src/server/identity.ts'
 
 /** In-memory identity repository: accounts linked by (provider, subject), memberships tracked. */
@@ -105,35 +104,6 @@ describe('OIDC adapter', () => {
     const now = Math.floor(Date.now() / 1000)
     const unsigned = `${part({ alg: 'none' })}.${part({ iss: ISSUER, aud: AUDIENCE, sub: 'alice', exp: now + 300 })}.`
     expect(await auth.authenticate(bearer(unsigned))).toBeNull()
-  })
-})
-
-describe('trusted proxy', () => {
-  const make = () => {
-    const repo = new MemoryRepo()
-    const auth = trustedProxyAuth(repo, {
-      userHeader: 'remote-user',
-      groupsHeader: 'remote-groups',
-      proxies: ['10.0.0.2'],
-      clientAddress: (req) => req.headers.get('x-test-address') ?? undefined,
-    })
-    return auth
-  }
-  const request = (address: string) =>
-    new Request('https://hub.test/', {
-      headers: { 'remote-user': 'alice', 'remote-groups': 'lab', 'x-test-address': address },
-    })
-
-  it('reads the identity on a connection from the proxy', async () => {
-    expect(await make().authenticate(request('10.0.0.2'))).toMatchObject({
-      id: 'u1',
-      orgs: [{ id: 'lab' }],
-    })
-  })
-
-  // Otherwise anyone could pass as another person by setting the header.
-  it('ignores the identity header coming from another address', async () => {
-    expect(await make().authenticate(request('203.0.113.9'))).toBeNull()
   })
 })
 

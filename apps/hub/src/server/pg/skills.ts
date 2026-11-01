@@ -1,6 +1,6 @@
 // Skills on Postgres.
 
-import { and, asc, eq, inArray, or } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne, or } from 'drizzle-orm'
 
 import type { SkillRecord, Skills } from '../data.ts'
 import { uuidv7 } from '../ids.ts'
@@ -53,6 +53,29 @@ export const pgSkills = (db: Db): Skills => ({
       .onConflictDoNothing()
       .returning(record)
     return (row as SkillRecord | undefined) ?? 'name_taken'
+  },
+
+  async update(id, text) {
+    const [current] = await db.select(record).from(skills).where(eq(skills.id, id))
+    if (!current) throw new Error(`skill ${id} not found`)
+    // A name is unique among the skills of the same visibility and owner (or organization).
+    const sameScope =
+      current.visibility === 'private'
+        ? and(eq(skills.visibility, 'private'), eq(skills.ownerId, current.ownerId))
+        : current.visibility === 'organization'
+          ? and(
+              eq(skills.visibility, 'organization'),
+              eq(skills.organizationId, current.organizationId ?? ''),
+            )
+          : eq(skills.visibility, 'instance')
+    const [other] = await db
+      .select({ id: skills.id })
+      .from(skills)
+      .where(and(sameScope, eq(skills.name, text.name), ne(skills.id, id)))
+    if (other) return 'name_taken'
+    const [row] = await db.update(skills).set(text).where(eq(skills.id, id)).returning(record)
+    if (!row) throw new Error(`skill ${id} not found`)
+    return row as SkillRecord
   },
 
   async delete(id) {

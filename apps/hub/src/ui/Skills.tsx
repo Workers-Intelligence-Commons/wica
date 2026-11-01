@@ -26,6 +26,7 @@ type Listing = { skills: Skill[]; organizations: Organization[] }
 
 export function Skills({ admin }: { admin: boolean }) {
   const [listing, setListing] = useState<Listing | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
   const reload = useCallback(() => {
     void fetch('/api/skills')
       .then((r) => r.json() as Promise<Listing>)
@@ -51,11 +52,25 @@ export function Skills({ admin }: { admin: boolean }) {
       <ul className="rows">
         {(listing?.skills ?? []).map((skill) => (
           <li key={skill.id} className="provider">
+            {editing === skill.id ? (
+              <EditSkill
+                skill={skill}
+                onDone={() => {
+                  setEditing(null)
+                  reload()
+                }}
+              />
+            ) : null}
             <div className="inline">
               <span className="row-name">{skill.name}</span>
               <span className="row-detail">
                 {origin(skill)} · {skill.description}
               </span>
+              {skill.removable && editing !== skill.id ? (
+                <Button variant="quiet" onClick={() => setEditing(skill.id)}>
+                  Edit
+                </Button>
+              ) : null}
               {skill.removable ? (
                 <Button
                   variant="quiet"
@@ -78,6 +93,56 @@ export function Skills({ admin }: { admin: boolean }) {
         <SkillForm organizations={listing.organizations} admin={admin} onDone={reload} />
       ) : null}
     </section>
+  )
+}
+
+/** Replaces the name, the description and the instructions of a skill. */
+function EditSkill(props: { skill: Skill; onDone: () => void }) {
+  const [name, setName] = useState(props.skill.name)
+  const [description, setDescription] = useState(props.skill.description)
+  const [body, setBody] = useState(props.skill.body)
+  const [failed, setFailed] = useState<string | null>(null)
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    const response = await fetch(`/api/skills/${props.skill.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, description, body }),
+    })
+    const answer = (await response.json().catch(() => ({}))) as { error?: string }
+    if (!response.ok) {
+      setFailed(answer.error ?? 'The skill was not saved.')
+      return
+    }
+    props.onDone()
+  }
+
+  return (
+    <form onSubmit={submit} className="skill-edit">
+      <TextInput label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+      <TextInput
+        label="When to use it"
+        value={description}
+        onChange={(e) => setDescription(e.target.value)}
+        required
+      />
+      <TextArea
+        label="Instructions, in Markdown"
+        value={body}
+        onChange={(e) => setBody(e.target.value)}
+        required
+        error={failed}
+      />
+      <div className="inline">
+        <Button type="submit" variant="primary">
+          Save the skill
+        </Button>
+        <Button variant="quiet" onClick={props.onDone}>
+          Cancel
+        </Button>
+      </div>
+    </form>
   )
 }
 

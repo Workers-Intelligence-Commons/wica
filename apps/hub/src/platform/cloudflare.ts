@@ -12,6 +12,7 @@ import type { CommandOutcome, ConversationHost } from '../server/data.ts'
 import { d1ConversationIndex } from '../server/d1/conversations.ts'
 import { d1McpServers } from '../server/d1/mcp.ts'
 import { D1SessionStore } from '../server/d1/sessions.ts'
+import { d1Guests } from '../server/d1/guests.ts'
 import { d1Skills } from '../server/d1/skills.ts'
 import { d1TokenRows } from '../server/d1/tokens.ts'
 import { modelTokens } from '../server/tokens.ts'
@@ -61,5 +62,6 @@ export function cloudflareServices(env: CloudflareEnv) {
     mcpServers,
     mcpAccess: mcpAccess({ servers: mcpServers, key, publicFetch }),
     skills: d1Skills(db),
+    guests: d1Guests(db),
   }
 }

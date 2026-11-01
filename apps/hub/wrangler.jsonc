@@ -22,4 +22,6 @@
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ConversationObject"] }],
   "limits": { "cpu_ms": 300000 },
+  // Every hour: empties the trash and the conversations of guests idle for a month.
+  "triggers": { "crons": ["0 * * * *"] },
 }

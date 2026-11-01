@@ -5,6 +5,7 @@
 import { electricCollectionOptions, isChangeMessage } from '@tanstack/electric-db-collection'
 
 import type { ShapeTable } from '../../shared/rows.ts'
+import { guestHeaders } from '../guest.ts'
 
 type Utils = Record<string, unknown>
 
@@ -26,6 +27,13 @@ export function electricSync<T extends Record<string, unknown>>(options: {
     ...(options.gcTime !== undefined ? { gcTime: options.gcTime } : {}),
     shapeOptions: {
       url: new URL(`/api/shapes/${options.table}`, location.origin).toString(),
+      // A guest's key, read at each request: it may be created after the collection.
+      headers: Object.fromEntries(
+        ['x-wica-guest', 'x-wica-fingerprint'].map((name) => [
+          name,
+          () => guestHeaders()[name] ?? '',
+        ]),
+      ),
       ...(options.conversationId ? { params: { conversation: options.conversationId } } : {}),
     },
   })

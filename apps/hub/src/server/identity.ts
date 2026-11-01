@@ -1,6 +1,6 @@
 // Identity: the rest of the application sees only a `Principal`. API keys and the session cookie
-// belong to the application; a configured adapter (the hub's own accounts, generic OIDC or a
-// trusted proxy) also recognizes external identities, and the admin token reaches the
+// belong to the application; a configured adapter (the hub's own accounts or generic OIDC) also
+// recognizes external identities, and the admin token reaches the
 // administration API.
 //
 // Adapter contract:
@@ -16,6 +16,7 @@
 
 import { createRemoteJWKSet, type JWTPayload, type JWTVerifyGetKey, jwtVerify } from 'jose'
 
+import { FRESH_SIGN_IN_MS } from '../shared/session.ts'
 import { sha256Hex, sign, verify } from './crypto.ts'
 
 export type Principal = {
@@ -24,7 +25,15 @@ export type Principal = {
   kind: 'user' | 'apiKey'
   orgs: { id: string; roles: string[] }[]
   scopes: string[]
+  /** When a browser session signed in, in milliseconds; absent for a key or an older cookie. */
+  signedInAt?: number
 }
+
+/** The principal is a browser session that signed in within `FRESH_SIGN_IN_MS`. */
+export const freshSignIn = (principal: Principal, now = Date.now()) =>
+  principal.kind === 'user' &&
+  principal.signedInAt !== undefined &&
+  now - principal.signedInAt < FRESH_SIGN_IN_MS
 
 export interface AuthProvider {
   authenticate(req: Request): Promise<Principal | null>
@@ -64,18 +73,19 @@ const bearer = (req: Request) => {
 
 /** Signed session cookie, linked to the internal account. */
 export async function sessionCookie(secret: string, userId: string, now = Date.now()) {
-  const value = await sign(secret, { uid: userId, exp: now + SESSION_TTL_MS })
+  const value = await sign(secret, { uid: userId, at: now, exp: now + SESSION_TTL_MS })
   return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_TTL_MS / 1000}`
 }
 
 export const clearSessionCookie = `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`
 
-/** Account of the browser session, if its cookie is signed and not expired. */
+/** Account of the browser session and when it signed in, if its cookie is signed and not expired. */
 export async function sessionUser(secret: string, req: Request, now = Date.now()) {
   const value = readCookie(req, SESSION_COOKIE)
   if (!value) return null
-  const session = await verify<{ uid: string; exp: number }>(secret, value)
-  return session && session.exp > now ? session.uid : null
+  const session = await verify<{ uid: string; at?: number; exp: number }>(secret, value)
+  if (!session || session.exp <= now) return null
+  return { userId: session.uid, ...(session.at !== undefined ? { signedInAt: session.at } : {}) }
 }
 
 /** Application API key, hashed in the database; prefix `wica_`. */
@@ -94,10 +104,14 @@ export type AppAuthOptions = {
 export function appAuth(options: AppAuthOptions): AuthProvider {
   return {
     async authenticate(req) {
-      const userId = await sessionUser(options.sessionSecret, req, options.now?.())
+      const session = await sessionUser(options.sessionSecret, req, options.now?.())
       // A cookie whose account no longer exists does not hide the other ways of signing in.
-      const principal = userId ? await options.repo.principal(userId) : null
-      if (principal) return principal
+      const principal = session ? await options.repo.principal(session.userId) : null
+      if (principal && session) {
+        return session.signedInAt !== undefined
+          ? { ...principal, signedInAt: session.signedInAt }
+          : principal
+      }
       const token = bearer(req)
       if (token?.startsWith(`${API_KEY_PREFIX}_`)) return options.repo.apiKey(await hashKey(token))
       return options.adapter ? options.adapter.authenticate(req) : null
@@ -236,55 +250,12 @@ export function oidcAuth(repo: IdentityRepo, options: OidcOptions): AuthProvider
   }
 }
 
-export type TrustedProxyOptions = {
-  /** Header that carries the subject authenticated by the proxy, for example `Remote-User`. */
-  userHeader: string
-  nameHeader?: string
-  /** Groups header, separated by commas, read as organizations. */
-  groupsHeader?: string
-  /** Proxy addresses; a request from elsewhere is never read by its headers. */
-  proxies: string[]
-  /** Address of the incoming connection, provided by the host. */
-  clientAddress: (req: Request) => string | undefined
-  provider?: string
-}
-
-/**
- * Trusted proxy: the identity header is read only on a connection that comes from the proxy. A
- * request from another address that carries it is ignored, so that no one can use it to pass as
- * someone else.
- */
-export function trustedProxyAuth(repo: IdentityRepo, options: TrustedProxyOptions): AuthProvider {
-  return {
-    async authenticate(req) {
-      const address = options.clientAddress(req)
-      if (!address || !options.proxies.includes(address)) return null
-      const subject = req.headers.get(options.userHeader)?.trim()
-      if (!subject) return null
-      const groups = options.groupsHeader ? req.headers.get(options.groupsHeader) : null
-      const userId = await repo.link({
-        provider: options.provider ?? 'proxy',
-        subject,
-        name: (options.nameHeader && req.headers.get(options.nameHeader)?.trim()) || subject,
-        ...(options.groupsHeader
-          ? {
-              orgs: (groups ?? '')
-                .split(',')
-                .map((g) => g.trim())
-                .filter(Boolean)
-                .map((name) => ({ name, roles: [] })),
-            }
-          : {}),
-      })
-      return repo.principal(userId)
-    },
-  }
-}
-
 /** OIDC authorization request with PKCE: the address to send the browser to, and what to keep. */
 export async function authorizationRequest(
   discovery: OidcDiscovery,
   client: { clientId: string; redirectUri: string; scope?: string },
+  /** Asks the issuer for a new sign-in even when it holds a session. */
+  fresh = false,
 ) {
   const verifier = randomUrlSafe(32)
   const state = randomUrlSafe(16)
@@ -298,6 +269,7 @@ export async function authorizationRequest(
     state,
     code_challenge: challenge,
     code_challenge_method: 'S256',
+    ...(fresh ? { prompt: 'login', max_age: '0' } : {}),
   }).toString()
   return { url: url.toString(), verifier, state }
 }

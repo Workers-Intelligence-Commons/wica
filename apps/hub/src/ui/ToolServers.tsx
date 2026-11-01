@@ -12,6 +12,7 @@ import {
   TextInput,
 } from '@workers-intelligence-commons/components'
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
+import { Rename, sendName } from './Rename.tsx'
 
 type CatalogEntry = { id: string; name: string; url: string; description: string }
 type Connection = {
@@ -104,6 +105,15 @@ function ConnectionRow({ connection, onChange }: { connection: Connection; onCha
           {connection.status === 'connected' ? 'connected' : 'sign-in needed'} ·{' '}
           {AUTH_LABELS[connection.auth]} · {connection.url}
         </span>
+        <Rename
+          label="Name of the tool server"
+          value={connection.name}
+          save={async (next) => {
+            const problem = await sendName(`/api/mcp/${connection.id}`, next)
+            if (!problem) onChange()
+            return problem
+          }}
+        />
         {connection.auth === 'oauth' ? (
           <Button onClick={() => void signIn()}>
             {connection.status === 'connected' ? 'Sign in again' : 'Sign in'}

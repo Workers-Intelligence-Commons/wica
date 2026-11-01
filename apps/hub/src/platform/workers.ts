@@ -16,7 +16,7 @@ let instance: HubServer | null = null
 function shared() {
   if (!instance) {
     const bindings = env as unknown as CloudflareEnv
-    const { config, db, index, tokens, mcpServers, mcpAccess, skills } =
+    const { config, db, index, tokens, mcpServers, mcpAccess, skills, guests } =
       cloudflareServices(bindings)
     const stub = (conversationId: string) => conversationStub(bindings, conversationId)
     const host: ConversationHost = {
@@ -35,6 +35,7 @@ function shared() {
       mcp: mcpServers,
       mcpAccess,
       skills,
+      guests,
     }
     instance = hubServer(config, data, {
       clientAddress: (req) => req.headers.get('cf-connecting-ip') ?? undefined,
@@ -50,5 +51,10 @@ export async function withHub<T>(_req: Request, fn: (hub: HubServer) => Promise<
 }
 
 export const startBackground = undefined
+
+/** The Cron Trigger of `wrangler.jsonc`: empties the trash and the idle guest conversations. */
+export async function scheduled() {
+  await shared().purge()
+}
 
 export { ConversationObject } from './conversation-object.ts'

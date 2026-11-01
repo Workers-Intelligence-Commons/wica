@@ -12,14 +12,15 @@ import {
   Switch,
   TextInput,
 } from '@workers-intelligence-commons/components'
-import { Link } from '@tanstack/react-router'
+import { Link, useRouter } from '@tanstack/react-router'
 import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
-import { logout } from '../client/session.ts'
+import { forgetBrowserMe, logout } from '../client/session.ts'
 import type { Me } from '../shared/session.ts'
 import { ApiKeys } from './ApiKeys.tsx'
 import { Skills } from './Skills.tsx'
 import { ToolServers } from './ToolServers.tsx'
+import { YourData } from './YourData.tsx'
 
 export const SETTINGS_SECTIONS = [
   { id: 'account', label: 'Account' },
@@ -28,6 +29,7 @@ export const SETTINGS_SECTIONS = [
   { id: 'tools', label: 'Tool servers' },
   { id: 'skills', label: 'Skills' },
   { id: 'keys', label: 'API keys' },
+  { id: 'data', label: 'Your data' },
 ] as const
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]['id']
@@ -50,6 +52,7 @@ export function Settings(props: {
     tools: () => <ToolServers returned={props.toolServer} />,
     skills: () => <Skills admin={props.me.admin} />,
     keys: () => <ApiKeys />,
+    data: () => <YourData me={props.me} />,
   }
   return (
     <div className="settings">
@@ -74,14 +77,47 @@ export function Settings(props: {
 }
 
 function Account({ me }: { me: Me }) {
+  const router = useRouter()
+  const [name, setName] = useState(me.name)
+  const [saved, setSaved] = useState(me.name)
+  const [failure, setFailure] = useState<string | null>(null)
+
+  async function rename(e: FormEvent) {
+    e.preventDefault()
+    setFailure(null)
+    const response = await fetch('/api/me', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }).catch(() => null)
+    if (!response?.ok) {
+      setFailure('The name was not saved: 1 to 80 characters.')
+      return
+    }
+    setSaved(name.trim())
+    forgetBrowserMe()
+    void router.invalidate()
+  }
+
   return (
     <section className="panel">
       <SectionHeading level={3} kicker="who you are here">
         Account
       </SectionHeading>
+      <form className="inline-form" onSubmit={(e) => void rename(e)}>
+        <TextInput
+          id="account-name"
+          label="Name"
+          value={name}
+          maxLength={80}
+          onChange={(e) => setName(e.target.value)}
+          {...(failure ? { error: failure } : {})}
+        />
+        <Button type="submit" variant="ink" disabled={!name.trim() || name.trim() === saved}>
+          Save the name
+        </Button>
+      </form>
       <dl className="facts">
-        <dt>Name</dt>
-        <dd>{me.name}</dd>
         <dt>Role</dt>
         <dd>{me.admin ? 'Administrator of this instance' : 'Member of this instance'}</dd>
       </dl>
@@ -104,7 +140,7 @@ const CONTRIBUTE_TEXT =
   "under CC0 1.0: anyone may use them, and Workers' Intelligence Commons will use them to train " +
   'its models. Before training, they are anonymized: names, addresses and other details that ' +
   'identify a person are removed. A dedication cannot be withdrawn: switching this off stops new ' +
-  'contributions only.'
+  'contributions only. They also stay in the commons if you delete them or your account.'
 
 function WicProvider() {
   const [on, setOn] = useState<boolean | null>(null)

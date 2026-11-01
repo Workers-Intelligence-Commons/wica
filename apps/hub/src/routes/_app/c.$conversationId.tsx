@@ -27,6 +27,8 @@ import {
 } from '../../client/collections.ts'
 import { command, sendMessage } from '../../client/commands.ts'
 import { prepareCache } from '../../client/dependencies.ts'
+import { restoreConversation } from '../../client/conversations.ts'
+import { apiFetch } from '../../client/guest.ts'
 import { callDetails } from '../../client/stats.ts'
 import { refreshList } from '../../client/sync/index.ts'
 import { branchesOf, conversationView, leafUnder } from '../../client/view.ts'
@@ -39,12 +41,13 @@ import {
 } from '../../ui/ModelPicker.tsx'
 import { Question } from '../../ui/Question.tsx'
 import { TopBar } from '../../ui/TopBar.tsx'
+import { useViewer } from '../_app.tsx'
 
 export const Route = createFileRoute('/_app/c/$conversationId')({
   beforeLoad: async ({ context, params }) => {
-    if (import.meta.env.SSR) return
-    await touchConversation(context.me.id, params.conversationId)
-    await prepareCache(cacheName(context.me.id, params.conversationId))
+    if (import.meta.env.SSR || !context.viewer) return
+    await touchConversation(context.viewer.id, params.conversationId)
+    await prepareCache(cacheName(context.viewer.id, params.conversationId))
   },
   component: ConversationPage,
 })
@@ -87,7 +90,7 @@ function useOnline() {
 }
 
 function Conversation({ conversationId }: { conversationId: string }) {
-  const { me } = Route.useRouteContext()
+  const viewer = useViewer()
   const db = useDbClient()
   const items = itemsCollection(conversationId)
   const chunks = chunksCollection(conversationId)
@@ -149,7 +152,7 @@ function Conversation({ conversationId }: { conversationId: string }) {
       const seq = rows.reduce((max, r) => Math.max(max, r.seq), 0) + 1
       const sent = sendMessage({
         items: db.collection(items),
-        account: me.id,
+        account: viewer.id,
         conversationId,
         salt: conversation.id_salt,
         parentId,
@@ -167,7 +170,7 @@ function Conversation({ conversationId }: { conversationId: string }) {
   const chooseModel = (next: string | null) =>
     run(async () => {
       setChosenModel({ model: next })
-      const response = await fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+      const response = await apiFetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ model: next }),
@@ -290,21 +293,33 @@ function Conversation({ conversationId }: { conversationId: string }) {
         <p className="failure" role="alert">
           {failure ?? view.error}
         </p>
-        <Composer
-          onSend={(text) => send(text)}
-          running={running}
-          onStop={() => run(() => command(conversationId, { t: 'interrupt' }))}
-          tools={
-            <>
-              <ModelPicker models={models} value={model} onChange={(m) => void chooseModel(m)} />
-              <ReasoningPicker
-                levels={levels}
-                value={level}
-                onChange={(l) => setChosenLevel({ level: l })}
-              />
-            </>
-          }
-        />
+        {conversation.deleted_at ? (
+          <div className="trashed" role="status">
+            <p>This conversation is in the trash: it is erased 30 days after its deletion.</p>
+            <Button
+              variant="primary"
+              onClick={() => void run(() => restoreConversation(conversationId))}
+            >
+              Restore
+            </Button>
+          </div>
+        ) : (
+          <Composer
+            onSend={(text) => send(text)}
+            running={running}
+            onStop={() => run(() => command(conversationId, { t: 'interrupt' }))}
+            tools={
+              <>
+                <ModelPicker models={models} value={model} onChange={(m) => void chooseModel(m)} />
+                <ReasoningPicker
+                  levels={levels}
+                  value={level}
+                  onChange={(l) => setChosenLevel({ level: l })}
+                />
+              </>
+            }
+          />
+        )}
       </Poster>
     </section>
   )

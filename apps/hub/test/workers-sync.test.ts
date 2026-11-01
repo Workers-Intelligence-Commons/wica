@@ -70,6 +70,8 @@ const row = (id: string, head: string | null): ConversationRow => ({
   model: null,
   head_item_id: head,
   id_salt: 'salt',
+  contributed_at: null,
+  deleted_at: null,
   created_at: '',
   updated_at: '',
 })

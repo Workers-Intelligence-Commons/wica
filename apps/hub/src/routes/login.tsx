@@ -1,6 +1,5 @@
 // Sign-in: with an account of the hub (email and password, kept by Better Auth), or by the OIDC
-// issuer. Behind a trusted proxy, the page is never reached: the proxy has already authenticated
-// the person. A new account is created on its own page (`/signup`), so that password managers
+// issuer. A new account is created on its own page (`/signup`), so that password managers
 // tell the two apart. When the hub sends emails, a person who forgot their password asks for a
 // reset link here.
 
@@ -40,6 +39,11 @@ function Login() {
       ) : (
         <AccountSignIn email={signIn.email} />
       )}
+      {signIn.guests ? (
+        <ButtonLink href="/" variant="quiet">
+          Try it without an account
+        </ButtonLink>
+      ) : null}
     </main>
   )
 }
@@ -63,7 +67,7 @@ function AccountSignIn({ email: sendsEmail }: { email: boolean }) {
     })
     setBusy(false)
     if (response.ok) {
-      location.assign('/')
+      location.assign(nextPath())
       return
     }
     const body = (await response.json().catch(() => ({}))) as { message?: string }
@@ -154,4 +158,12 @@ function ResetRequest({ onBack }: { onBack: () => void }) {
       </Button>
     </>
   )
+}
+
+/** Where to go after the sign-in: the page that asked for it, never another site. */
+function nextPath() {
+  const next = new URLSearchParams(location.search).get('next')
+  return next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')
+    ? next
+    : '/'
 }

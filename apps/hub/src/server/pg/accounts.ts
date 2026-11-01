@@ -7,7 +7,7 @@ import { ADMIN_ROLE, type Accounts } from '../data.ts'
 import { uuidv7 } from '../ids.ts'
 import { API_KEY_PREFIX, type ExternalProfile, type Principal } from '../identity.ts'
 import { type Db, isUuid } from './db.ts'
-import { apiKeys, identities, memberships, organizations, users } from './schema.ts'
+import { apiKeys, consents, identities, memberships, organizations, users } from './schema.ts'
 
 export class PgAccounts implements Accounts {
   readonly #db: Db
@@ -132,7 +132,11 @@ export class PgAccounts implements Accounts {
     })
   }
 
-  async createApiKey(owner: { userId: string } | { organizationId: string }, scopes: string[]) {
+  async createApiKey(
+    owner: { userId: string } | { organizationId: string },
+    scopes: string[],
+    name = '',
+  ) {
     const token = randomToken(API_KEY_PREFIX)
     await this.#db.insert(apiKeys).values({
       id: uuidv7(),
@@ -140,17 +144,28 @@ export class PgAccounts implements Accounts {
       userId: 'userId' in owner ? owner.userId : null,
       organizationId: 'organizationId' in owner ? owner.organizationId : null,
       scopes,
+      name,
     })
     return token
   }
 
   async apiKeys(userId: string) {
     const rows = await this.#db
-      .select({ id: apiKeys.id, createdAt: apiKeys.createdAt })
+      .select({ id: apiKeys.id, name: apiKeys.name, createdAt: apiKeys.createdAt })
       .from(apiKeys)
       .where(and(eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)))
       .orderBy(asc(apiKeys.createdAt))
-    return rows.map((r) => ({ id: r.id, createdAt: r.createdAt.toISOString() }))
+    return rows.map((r) => ({ id: r.id, name: r.name, createdAt: r.createdAt.toISOString() }))
+  }
+
+  async renameApiKey(userId: string, id: string, name: string) {
+    if (!isUuid(id)) return false
+    const renamed = await this.#db
+      .update(apiKeys)
+      .set({ name })
+      .where(and(eq(apiKeys.id, id), eq(apiKeys.userId, userId), isNull(apiKeys.revokedAt)))
+      .returning({ id: apiKeys.id })
+    return renamed.length > 0
   }
 
   async revokeApiKey(userId: string, id: string) {
@@ -171,6 +186,15 @@ export class PgAccounts implements Accounts {
     return user?.name ?? null
   }
 
+  async rename(userId: string, name: string) {
+    await this.#db.update(users).set({ displayName: name }).where(eq(users.id, userId))
+  }
+
+  async deleteAccount(userId: string) {
+    // Every row of the account refers to `users` with a cascade.
+    await this.#db.delete(users).where(eq(users.id, userId))
+  }
+
   async contributor(userId: string) {
     const [user] = await this.#db
       .select({ on: users.contributor })
@@ -181,5 +205,23 @@ export class PgAccounts implements Accounts {
 
   async setContributor(userId: string, on: boolean) {
     await this.#db.update(users).set({ contributor: on }).where(eq(users.id, userId))
+  }
+
+  async consents(userId: string) {
+    const rows = await this.#db
+      .select({ kind: consents.kind, granted: consents.granted, at: consents.at })
+      .from(consents)
+      .where(eq(consents.userId, userId))
+    return rows.map((r) => ({ ...r, at: r.at.toISOString() }))
+  }
+
+  async setConsent(userId: string, kind: string, granted: boolean) {
+    await this.#db
+      .insert(consents)
+      .values({ userId, kind, granted })
+      .onConflictDoUpdate({
+        target: [consents.userId, consents.kind],
+        set: { granted, at: sql`now()` },
+      })
   }
 }

@@ -30,7 +30,8 @@ export type ItemShapeRow = Omit<ItemRow, 'blob_sha256'>
 
 export type ConversationRow = {
   id: string
-  owner_id: string
+  /** Null for a guest's conversation. */
+  owner_id: string | null
   organization_id: string | null
   parent_conversation_id: string | null
   parent_call_id: string | null
@@ -38,6 +39,10 @@ export type ConversationRow = {
   model: string | null
   head_item_id: string | null
   id_salt: string
+  /** When it was given to the commons under CC0; `null` while it is not. */
+  contributed_at: string | null
+  /** When it was put in the trash; `null` outside it. */
+  deleted_at: string | null
   created_at: string
   updated_at: string
 }

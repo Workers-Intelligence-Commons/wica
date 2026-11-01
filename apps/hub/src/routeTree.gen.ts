@@ -15,6 +15,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppAdminRouteImport } from './routes/_app/admin'
+import { Route as AppConversationsRouteImport } from './routes/_app/conversations'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppCConversationIdRouteImport } from './routes/_app/c.$conversationId'
 
@@ -47,6 +48,11 @@ const AppAdminRoute = AppAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AppRoute,
 } as any)
+const AppConversationsRoute = AppConversationsRouteImport.update({
+  id: '/conversations',
+  path: '/conversations',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -64,6 +70,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin': typeof AppAdminRoute
+  '/conversations': typeof AppConversationsRoute
   '/settings': typeof AppSettingsRoute
   '/c/$conversationId': typeof AppCConversationIdRoute
 }
@@ -72,6 +79,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin': typeof AppAdminRoute
+  '/conversations': typeof AppConversationsRoute
   '/settings': typeof AppSettingsRoute
   '/': typeof AppIndexRoute
   '/c/$conversationId': typeof AppCConversationIdRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/_app/admin': typeof AppAdminRoute
+  '/_app/conversations': typeof AppConversationsRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/': typeof AppIndexRoute
   '/_app/c/$conversationId': typeof AppCConversationIdRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin'
+    | '/conversations'
     | '/settings'
     | '/c/$conversationId'
   fileRoutesByTo: FileRoutesByTo
@@ -103,6 +113,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin'
+    | '/conversations'
     | '/settings'
     | '/'
     | '/c/$conversationId'
@@ -113,6 +124,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/_app/admin'
+    | '/_app/conversations'
     | '/_app/settings'
     | '/_app/'
     | '/_app/c/$conversationId'
@@ -169,6 +181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAdminRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/conversations': {
+      id: '/_app/conversations'
+      path: '/conversations'
+      fullPath: '/conversations'
+      preLoaderRoute: typeof AppConversationsRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -188,6 +207,7 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAdminRoute: typeof AppAdminRoute
+  AppConversationsRoute: typeof AppConversationsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
   AppCConversationIdRoute: typeof AppCConversationIdRoute
@@ -195,6 +215,7 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRoute,
+  AppConversationsRoute: AppConversationsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
   AppCConversationIdRoute: AppCConversationIdRoute,

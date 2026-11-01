@@ -84,10 +84,15 @@ export function conversationTurns(deps: TurnDeps) {
         from: { channel: 'web', author: claims.uid, trust: 'owner' },
       }
     },
+    // A guest acts as `guest:` and their key, on the conversations of the key that no account owns.
     async canAccess(identity, conversationId) {
       const userId = (identity as { userId?: string }).userId
       const entry = await index.get(conversationId)
-      return Boolean(userId && entry && entry.ownerId === userId)
+      if (!userId || !entry) return false
+      if (userId.startsWith('guest:')) {
+        return entry.ownerId === null && entry.guestId === userId.slice('guest:'.length)
+      }
+      return entry.ownerId === userId
     },
   }
 

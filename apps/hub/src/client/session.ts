@@ -40,3 +40,27 @@ export const getSignIn = createIsomorphicFn()
     const response = await fetch('/auth/mode')
     return (await response.json()) as SignIn
   })
+
+/**
+ * Who uses the page: an account, or a guest once they agreed to the fingerprint. `id` names the
+ * cache files and is the author of the messages.
+ */
+export type Viewer = { kind: 'user' | 'guest'; id: string }
+
+/** The next read of the account asks the server again, after a change to it. */
+export function forgetBrowserMe() {
+  browserMe = undefined
+}
+
+/**
+ * A new sign-in of the same account, then back to `next`: the hub's own accounts sign out and
+ * sign in on the login page; an OIDC issuer is asked for a new sign-in even if it holds a session.
+ */
+export async function signInAgain(me: Me, next: string) {
+  if (me.auth === 'oidc') {
+    location.assign(`/auth/oidc?fresh=1&next=${encodeURIComponent(next)}`)
+    return
+  }
+  await fetch('/auth/logout', { method: 'POST' })
+  location.assign(`/login?next=${encodeURIComponent(next)}`)
+}

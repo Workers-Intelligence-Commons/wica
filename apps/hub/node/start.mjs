@@ -1,10 +1,8 @@
 // Compose startup: serves the client files, passes the rest to the compiled server, and starts
-// the wake-up loop. The client address replaces any header of the same name sent by the client,
-// for the trusted proxy. Behind Caddy, the incoming connection always comes from Caddy: the last
-// address in `X-Forwarded-For` is the one it saw, and it overwrites those of its client. The
-// request takes the protocol (`X-Forwarded-Proto`) and the host (`X-Forwarded-Host`) that the
-// browser used, in its address and in its `Host` header: the sign-in compares them with the
-// browser's `Origin`, and the hub builds its return addresses and email links from them.
+// the wake-up loop. Behind Caddy, the request takes the protocol (`X-Forwarded-Proto`) and the
+// host (`X-Forwarded-Host`) that the browser used, in its address and in its `Host` header: the
+// sign-in compares them with the browser's `Origin`, and the hub builds its return addresses and
+// email links from them.
 
 import { serve } from 'srvx'
 import { staticMiddleware } from 'srvx/static'
@@ -16,6 +14,10 @@ const behindCaddy = process.env.WICA_BEHIND_CADDY === '1'
 /** A host name or address, with an optional port. */
 const HOST = /^([a-z0-9.-]+|\[[0-9a-f:.]+\])(:\d{1,5})?$/i
 
+/**
+ * The person's network address, for the daily messages of guests. Behind Caddy, the connection
+ * comes from Caddy: the last address of `X-Forwarded-For` is the one it saw.
+ */
 const clientAddress = (request) =>
   behindCaddy
     ? request.headers.get('x-forwarded-for')?.split(',').at(-1)?.trim() || undefined
@@ -27,6 +29,7 @@ const server = serve({
   middleware: [staticMiddleware({ dir: new URL('../dist/client', import.meta.url).pathname })],
   fetch(request) {
     const headers = new Headers(request.headers)
+    // A client never chooses its own address.
     headers.delete('x-wica-client-address')
     const address = clientAddress(request)
     if (address) headers.set('x-wica-client-address', address)

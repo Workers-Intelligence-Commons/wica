@@ -5,6 +5,7 @@ import type { Session, SessionStore } from '@wica/runtime'
 import { and, eq, sql } from 'drizzle-orm'
 
 import type { Db } from './db.ts'
+import { accountOf } from '../data.ts'
 import { sessionCommands, sessions } from './schema.ts'
 
 export class PgSessionStore implements SessionStore {
@@ -32,7 +33,7 @@ export class PgSessionStore implements SessionStore {
     const expires = sql`to_timestamp(${expiresAt / 1000})`
     await this.#db
       .insert(sessions)
-      .values({ id: session.id, userId: identity?.userId ?? null, state, expiresAt: expires })
+      .values({ id: session.id, userId: accountOf(identity?.userId), state, expiresAt: expires })
       .onConflictDoUpdate({
         target: sessions.id,
         set: { state, expiresAt: expires, lastSeenAt: sql`now()` },

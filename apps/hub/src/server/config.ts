@@ -14,13 +14,6 @@ export type AuthConfig =
       orgsClaim?: string
       rolesClaim?: string
     }
-  | {
-      kind: 'proxy'
-      userHeader: string
-      nameHeader?: string
-      groupsHeader?: string
-      proxies: string[]
-    }
 
 /** Storage of the target: Postgres and Electric on Compose, the Cloudflare bindings on Workers. */
 export type PgStorage = {
@@ -43,7 +36,15 @@ export type HubConfig = {
   model?: { url: string; id: string; apiKey?: string }
   /** Fake models from `@wica/testing/lorem`, offered next to the others for trying the hub. */
   testModels: boolean
+  /**
+   * People without an account may talk to the default model, up to `dailyLimit` messages a day;
+   * absent when the instance does not accept guests.
+   */
+  guests?: { dailyLimit: number }
 }
+
+/** Messages a guest may send each day when the instance does not set its own number. */
+export const GUEST_DAILY_LIMIT = 20
 
 export class ConfigError extends Error {
   override name = 'ConfigError'
@@ -85,25 +86,8 @@ export function readConfig(env: Env, target: 'node' | 'workers' = 'node'): HubCo
       ...(orgsClaim ? { orgsClaim } : {}),
       ...(rolesClaim ? { rolesClaim } : {}),
     }
-  } else if (kind === 'proxy') {
-    const nameHeader = optional(env, 'PROXY_NAME_HEADER')
-    const groupsHeader = optional(env, 'PROXY_GROUPS_HEADER')
-    auth = {
-      kind,
-      userHeader: required(
-        env,
-        'PROXY_USER_HEADER',
-        'header of the subject authenticated by the proxy.',
-      ),
-      proxies: required(env, 'PROXY_ADDRESSES', 'proxy addresses, separated by commas.')
-        .split(',')
-        .map((a) => a.trim())
-        .filter(Boolean),
-      ...(nameHeader ? { nameHeader } : {}),
-      ...(groupsHeader ? { groupsHeader } : {}),
-    }
   } else {
-    throw new ConfigError('WICA_AUTH must be accounts, oidc or proxy.')
+    throw new ConfigError('WICA_AUTH must be accounts or oidc.')
   }
   const modelUrl = optional(env, 'WICA_MODEL_URL')
   const modelId = optional(env, 'WICA_MODEL')
@@ -114,6 +98,18 @@ export function readConfig(env: Env, target: 'node' | 'workers' = 'node'): HubCo
   const testModels = optional(env, 'WICA_TEST_MODELS')
   if (testModels !== undefined && testModels !== '1') {
     throw new ConfigError('WICA_TEST_MODELS is 1 or stays empty.')
+  }
+  const guests = optional(env, 'WICA_GUESTS')
+  if (guests !== undefined && guests !== '1') {
+    throw new ConfigError('WICA_GUESTS is 1 or stays empty.')
+  }
+  if (guests && !modelId) {
+    throw new ConfigError('WICA_GUESTS needs WICA_MODEL: guests talk to the default model only.')
+  }
+  const limitText = optional(env, 'WICA_GUEST_DAILY_LIMIT')
+  const dailyLimit = limitText === undefined ? GUEST_DAILY_LIMIT : Number(limitText)
+  if (!Number.isInteger(dailyLimit) || dailyLimit < 1) {
+    throw new ConfigError('WICA_GUEST_DAILY_LIMIT is a whole number of messages, 1 or more.')
   }
   const electricSecret = optional(env, 'ELECTRIC_SECRET')
   const adminToken = optional(env, 'WICA_ADMIN_TOKEN')
@@ -136,6 +132,7 @@ export function readConfig(env: Env, target: 'node' | 'workers' = 'node'): HubCo
     instanceKey: required(env, 'WICA_INSTANCE_KEY', '32 random bytes in base64.'),
     auth,
     testModels: testModels === '1',
+    ...(guests ? { guests: { dailyLimit } } : {}),
     ...(adminToken ? { adminToken } : {}),
     ...(modelUrl && modelId
       ? { model: { url: modelUrl, id: modelId, ...(modelKey ? { apiKey: modelKey } : {}) } }

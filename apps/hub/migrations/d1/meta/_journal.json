@@ -43,6 +43,13 @@
       "when": 1793548096745,
       "tag": "0005_contributor",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793553546211,
+      "tag": "0006_data_management",
+      "breakpoints": true
     }
   ]
 }

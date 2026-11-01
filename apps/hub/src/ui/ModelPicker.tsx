@@ -4,6 +4,7 @@
 import type { ReasoningLevel } from '@wica/core'
 import { Picker } from '@workers-intelligence-commons/components'
 import { useEffect, useState } from 'react'
+import { apiFetch } from '../client/guest.ts'
 
 import { ProviderLogo } from './ProviderLogo.tsx'
 
@@ -24,7 +25,7 @@ export type ModelOption = {
 export function useModels() {
   const [models, setModels] = useState<ModelOption[] | null>(null)
   useEffect(() => {
-    void fetch('/api/models')
+    void apiFetch('/api/models')
       .then((r) => r.json() as Promise<{ default: ModelOption | null; models: ModelOption[] }>)
       .then((body) => setModels([...(body.default ? [body.default] : []), ...body.models]))
       .catch(() => setModels([]))

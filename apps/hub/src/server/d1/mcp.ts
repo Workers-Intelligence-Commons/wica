@@ -1,6 +1,6 @@
 // The tool server catalog and the tool servers of each account, on D1.
 
-import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm'
+import { and, asc, eq, isNull, lte, ne, or, sql } from 'drizzle-orm'
 
 import { uuidv7 } from '../ids.ts'
 import type { McpConnection, McpServers, SealedSecret } from '../data.ts'
@@ -77,6 +77,22 @@ export const d1McpServers = (db: D1Db): McpServers => ({
       .onConflictDoNothing()
       .returning(connection)
     return (row as McpConnection | undefined) ?? 'name_taken'
+  },
+
+  async rename(userId, id, name) {
+    const [other] = await db
+      .select({ id: connections.id })
+      .from(connections)
+      .where(
+        and(eq(connections.userId, userId), eq(connections.name, name), ne(connections.id, id)),
+      )
+    if (other) return 'name_taken'
+    const renamed = await db
+      .update(connections)
+      .set({ name })
+      .where(and(eq(connections.id, id), eq(connections.userId, userId)))
+      .returning({ id: connections.id })
+    return renamed.length > 0
   },
 
   async disconnect(userId, id) {
