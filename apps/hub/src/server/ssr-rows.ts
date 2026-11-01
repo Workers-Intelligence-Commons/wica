@@ -25,6 +25,8 @@ export async function serverRows(
   const path = pathTo(journal.items.map(rowToItem), journal.head).slice(-SSR_PATH_ITEMS)
   const shown = new Set(path.map((i) => i.id))
   if (table === 'items') return journal.items.filter((r) => shown.has(r.id))
+  if (table === 'model_calls')
+    return journal.calls.filter((c) => c.item_ids.some((id) => shown.has(id)))
   const streaming = new Set(path.filter((i) => i.status === 'streaming').map((i) => i.id))
   return journal.chunks.filter((c) => streaming.has(c.item_id))
 }

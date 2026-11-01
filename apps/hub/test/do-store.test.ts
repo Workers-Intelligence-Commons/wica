@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vite-plus/test'
 import { migrateConversation } from '../src/server/do/migrations.ts'
 import { DoStore, journalRows } from '../src/server/do/store.ts'
 import type { LiveFrame } from '../src/shared/live.ts'
+import type { ModelCallRow } from '../src/shared/rows.ts'
 import { durableStorage } from './sqlite.ts'
 
 /** A conversation database migrated by the files the Durable Object applies. */
@@ -79,5 +80,35 @@ describe('Durable Object journal', () => {
       { t: 'chunks_cleared', itemId: 't' },
     ])
     expect(journalRows(db, 'c1')).toMatchObject({ head: 't', chunks: [] })
+  })
+
+  // A tab that opens or reconnects gets the measures of the responses already written.
+  it('sends a recorded model call to the sockets and keeps it in the snapshot', async () => {
+    const db = await conversationDb()
+    const frames: LiveFrame[] = []
+    const store = new DoStore(
+      db,
+      async () => 'salt',
+      (f) => frames.push(f),
+    )
+    await store.ensure('c1')
+    const call: ModelCallRow = {
+      conversation_id: 'c1',
+      id: 'k1',
+      item_ids: ['a', 'b'],
+      model: 'pi:anthropic/claude-a',
+      model_name: 'Claude A',
+      started_at: '2026-11-01T10:00:00.000Z',
+      first_token_ms: 420,
+      duration_ms: 3_100,
+      input_tokens: 900,
+      output_tokens: 150,
+      cache_read_tokens: 800,
+      cache_write_tokens: 0,
+      reasoning: null,
+    }
+    await store.recordCall(call)
+    expect(frames).toEqual([{ t: 'calls', rows: [call] }])
+    expect(journalRows(db, 'c1').calls).toEqual([call])
   })
 })

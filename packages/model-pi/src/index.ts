@@ -18,9 +18,19 @@ import type {
   ToolCall,
   TSchema,
 } from '@earendil-works/pi-ai'
-import { toTranscript, type TranscriptEntry } from '@wica/codecs'
-import type { AssistantMessage, AssistantPart, ModelRequest, Part, ToolSpec } from '@wica/core'
+import { clampThinkingLevel } from '@earendil-works/pi-ai'
+import { type ModelUsage, toTranscript, type TranscriptEntry } from '@wica/codecs'
+import type {
+  AssistantMessage,
+  AssistantPart,
+  ModelRequest,
+  Part,
+  ReasoningLevel,
+  ToolSpec,
+} from '@wica/core'
 import type { ModelAdapter, ModelChunk } from '@wica/runtime'
+
+export type { ModelUsage } from '@wica/codecs'
 
 export type PiModelOptions = {
   /** Collection of pi-ai models, created and authenticated by the host. */
@@ -28,6 +38,7 @@ export type PiModelOptions = {
   /** Provider and model in the pi-ai sense, for example `anthropic` and `claude-sonnet-5-5`. */
   provider: string
   model: string
+  /** Level when a request carries none; a request's own level comes first. */
   reasoning?: ThinkingLevel
   /** pi-ai request options (key, headers, retries, duration); neither signal nor reasoning. */
   request?: Omit<ModelsSimpleStreamOptions, 'signal' | 'reasoning'>
@@ -36,6 +47,8 @@ export type PiModelOptions = {
    * login), so that the host warns the person; the host keeps track of a warning already given.
    */
   onFirstSubscriptionUse?: (provider: string) => void | Promise<void>
+  /** Tokens of each response, as pi-ai reports them; called before its final chunk. */
+  onUsage?: (usage: ModelUsage) => void
 }
 
 /** Failure of the provider, returned by pi-ai. */
@@ -222,6 +235,19 @@ export function fromPiMessage(message: PiAssistantMessage, model: Target): Assis
   return { parts }
 }
 
+/**
+ * The level pi-ai sends for this model: the nearest one it supports, none for `off` or for a
+ * model that does not reason.
+ */
+export function piReasoning(
+  model: Model<Api>,
+  level: ReasoningLevel | undefined,
+): ThinkingLevel | undefined {
+  if (!level || level === 'off' || !model.reasoning) return undefined
+  const clamped = clampThinkingLevel(model, level)
+  return clamped === 'off' ? undefined : clamped
+}
+
 export function piModel(options: PiModelOptions): ModelAdapter {
   let warned = false
 
@@ -243,9 +269,10 @@ export function piModel(options: PiModelOptions): ModelAdapter {
   return {
     async *stream(request, signal): AsyncIterable<ModelChunk> {
       const model = await resolve()
+      const reasoning = piReasoning(model, request.reasoning ?? options.reasoning)
       const events = options.models.streamSimple(model, toPiContext(request, model), {
         ...options.request,
-        ...(options.reasoning ? { reasoning: options.reasoning } : {}),
+        ...(reasoning ? { reasoning } : {}),
         signal,
       })
       for await (const event of events) {
@@ -256,9 +283,12 @@ export function piModel(options: PiModelOptions): ModelAdapter {
           case 'thinking_delta':
             if (event.delta !== '') yield { type: 'reasoning', text: event.delta }
             break
-          case 'done':
+          case 'done': {
+            const { input, output, cacheRead, cacheWrite } = event.message.usage
+            options.onUsage?.({ input, output, cacheRead, cacheWrite })
             yield { type: 'done', message: fromPiMessage(event.message, model) }
             return
+          }
           case 'error':
             throw new ModelError(
               event.error.errorMessage ??

@@ -29,7 +29,7 @@ function Login() {
   const signIn = Route.useLoaderData()
   return (
     <main className="login">
-      <Mark name="wic" height={64} label="Workers' Intelligence Commons" />
+      <Mark name="hub" height={64} label="WIC hub" />
       {signIn.kind === 'oidc' ? (
         <>
           <SectionHeading kicker="wica">Sign in</SectionHeading>

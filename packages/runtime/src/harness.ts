@@ -10,6 +10,7 @@ import {
   type Part,
   type Policy,
   type Question,
+  REASONING_LEVELS,
   type ToolCall,
   type Trust,
 } from '@wica/core'
@@ -392,7 +393,19 @@ export function createHarness(options: HarnessOptions) {
   ): Promise<EventBody[]> => {
     switch (command.t) {
       case 'send':
-        return [{ t: 'user_message', parentId: command.parentId, parts: command.parts, from }]
+        // The command comes from the network: a level no adapter knows stops here.
+        if (command.reasoning !== undefined && !REASONING_LEVELS.includes(command.reasoning)) {
+          throw new Error(`unknown reasoning level: ${String(command.reasoning)}`)
+        }
+        return [
+          {
+            t: 'user_message',
+            parentId: command.parentId,
+            parts: command.parts,
+            from,
+            ...(command.reasoning ? { reasoning: command.reasoning } : {}),
+          },
+        ]
       case 'answer': {
         const prefix = approvalCallId('')
         if (command.callId.startsWith(prefix)) {

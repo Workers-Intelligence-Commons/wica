@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vite-plus/test'
 
 import type { RowBatch } from '../src/client/sync/workers.ts'
 import type { LiveFrame } from '../src/shared/live.ts'
-import type { ChunkRow, ConversationRow, ItemShapeRow } from '../src/shared/rows.ts'
+import type { ChunkRow, ConversationRow, ItemShapeRow, ModelCallRow } from '../src/shared/rows.ts'
 
 /** A socket the test drives: it records the sockets opened and delivers the frames given. */
 class FakeSocket {
@@ -42,6 +42,22 @@ const chunk = (itemId: string, idx: number): ChunkRow => ({
   item_id: itemId,
   idx,
   text: `${itemId}-${idx}`,
+})
+
+const call = (id: string, itemIds: string[]): ModelCallRow => ({
+  conversation_id: 'c1',
+  id,
+  item_ids: itemIds,
+  model: null,
+  model_name: 'wpt',
+  started_at: '2026-11-01T10:00:00.000Z',
+  first_token_ms: 300,
+  duration_ms: 2_000,
+  input_tokens: 120,
+  output_tokens: 40,
+  cache_read_tokens: 0,
+  cache_write_tokens: 0,
+  reasoning: null,
 })
 
 const row = (id: string, head: string | null): ConversationRow => ({
@@ -85,7 +101,7 @@ describe('Workers sync of a conversation', () => {
     expect(FakeSocket.opened).toHaveLength(1)
     expect(socket?.url).toBe('wss://hub.test/api/live/c1')
 
-    socket?.send({ t: 'snapshot', head: 'a', items: [item('a', 1)], chunks: [] })
+    socket?.send({ t: 'snapshot', head: 'a', items: [item('a', 1)], chunks: [], calls: [] })
     socket?.send({ t: 'items', rows: [item('b', 2, 'streaming')] })
     socket?.send({ t: 'chunks', rows: [chunk('b', 0), chunk('b', 1)] })
     socket?.send({ t: 'items', rows: [item('b', 2, 'done')] })
@@ -113,10 +129,31 @@ describe('Workers sync of a conversation', () => {
     ])
   })
 
+  // The measures of each response reach the browser on the same socket as its items.
+  it('turns the socket frames into the rows of the model calls', () => {
+    const calls: RowBatch<ModelCallRow>[] = []
+    sync.followItems('c1', () => {})
+    sync.followCalls('c1', (b) => calls.push(b))
+    expect(FakeSocket.opened).toHaveLength(1)
+    const socket = FakeSocket.opened[0]
+    socket?.send({ t: 'snapshot', head: 'a', items: [], chunks: [], calls: [call('k1', ['a'])] })
+    socket?.send({ t: 'calls', rows: [call('k2', ['b', 'c'])] })
+    expect(calls).toEqual([
+      { snapshot: [call('k1', ['a'])] },
+      { changes: [{ type: 'insert', value: call('k2', ['b', 'c']) }] },
+    ])
+  })
+
   // A view opened after the snapshot must not wait for a frame that already passed.
   it('gives a collection that arrives late the rows already delivered', () => {
     sync.followItems('c1', () => {})
-    FakeSocket.opened[0]?.send({ t: 'snapshot', head: null, items: [item('a', 1)], chunks: [] })
+    FakeSocket.opened[0]?.send({
+      t: 'snapshot',
+      head: null,
+      items: [item('a', 1)],
+      chunks: [],
+      calls: [],
+    })
     FakeSocket.opened[0]?.send({ t: 'items', rows: [item('b', 2)] })
     const late: RowBatch<ItemShapeRow>[] = []
     sync.followItems('c1', (b) => late.push(b))
@@ -128,7 +165,7 @@ describe('Workers sync of a conversation', () => {
   it('confirms an item once the socket delivers it', async () => {
     const confirm = sync.rowConfirmation('c1')
     const seen = confirm('m1', 1_000)
-    FakeSocket.opened[0]?.send({ t: 'snapshot', head: null, items: [], chunks: [] })
+    FakeSocket.opened[0]?.send({ t: 'snapshot', head: null, items: [], chunks: [], calls: [] })
     FakeSocket.opened[0]?.send({ t: 'items', rows: [item('m1', 1)] })
     await expect(seen).resolves.toBe(true)
     expect(FakeSocket.opened[0]?.closed).toBe(true)
@@ -147,7 +184,7 @@ describe('Workers sync of the conversation list', () => {
     )
     sync.followItems('c1', () => {})
     await vi.waitFor(() => expect(list).toHaveLength(1))
-    FakeSocket.opened[0]?.send({ t: 'snapshot', head: 'b', items: [], chunks: [] })
+    FakeSocket.opened[0]?.send({ t: 'snapshot', head: 'b', items: [], chunks: [], calls: [] })
     expect(list.at(-1)).toEqual({ changes: [{ type: 'update', value: row('c1', 'b') }] })
 
     sync.refreshList()

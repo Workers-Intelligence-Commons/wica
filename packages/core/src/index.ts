@@ -1,4 +1,5 @@
 export type * from './journal.ts'
+export { REASONING_LEVELS } from './journal.ts'
 export * from './model.ts'
 export * from './autonomy.ts'
 export * from './compaction.ts'

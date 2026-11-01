@@ -8,6 +8,7 @@ import {
   type Origin,
   type Part,
   pathTo,
+  type ReasoningLevel,
   settled,
   userMessageId,
 } from '@wica/core'
@@ -374,19 +375,31 @@ export function createClient(transport: ClientTransport, options: ClientOptions 
       return () => m.listeners.delete(listener)
     },
 
-    /** Sends a message and returns its identifier, computed the way the server will. */
+    /**
+     * Sends a message, with the reasoning level chosen for its answer, and returns its
+     * identifier, computed the way the server will.
+     */
     async send(
       conversationId: string,
       parts: Part[] | string,
       parentId?: string | null,
+      reasoning?: ReasoningLevel,
     ): Promise<string | null> {
       const m = mirror(conversationId)
       const content: Part[] = typeof parts === 'string' ? [{ type: 'text', text: parts }] : parts
       const parent = parentId !== undefined ? parentId : m.head
-      await command(conversationId, { t: 'send', parentId: parent, parts: content })
+      const level = reasoning ? { reasoning } : {}
+      await command(conversationId, { t: 'send', parentId: parent, parts: content, ...level })
       return m.salt === null
         ? null
-        : userMessageId({ salt: m.salt, conversationId, parentId: parent, from, parts: content })
+        : userMessageId({
+            salt: m.salt,
+            conversationId,
+            parentId: parent,
+            from,
+            parts: content,
+            ...level,
+          })
     },
 
     answer: (conversationId: string, callId: string, value: unknown) =>

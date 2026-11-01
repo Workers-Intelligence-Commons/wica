@@ -33,6 +33,8 @@ export const users = pgTable('users', {
     .array()
     .notNull()
     .default(sql`'{}'`),
+  /** Gives the conversations to the commons from now on (CC0); off until the person turns it on. */
+  contributor: boolean('contributor').notNull().default(false),
   createdAt: createdAt(),
 })
 
@@ -120,6 +122,11 @@ export const conversations = pgTable(
     model: text('model'),
     headItemId: text('head_item_id'),
     idSalt: text('id_salt').notNull(),
+    /**
+     * When the conversation was given to the commons under CC0: set by the first message sent
+     * while its owner contributes, and never cleared, since the dedication cannot be withdrawn.
+     */
+    contributedAt: at('contributed_at'),
     createdAt: createdAt(),
     updatedAt: at('updated_at').notNull().defaultNow(),
   },
@@ -180,6 +187,30 @@ export const itemChunks = pgTable(
       foreignColumns: [items.conversationId, items.id],
     }).onDelete('cascade'),
   ],
+)
+
+/** Completed model calls of a conversation, with their measures (`ModelCallRow`). */
+export const modelCalls = pgTable(
+  'model_calls',
+  {
+    conversationId: text('conversation_id')
+      .notNull()
+      .references(() => conversations.id, { onDelete: 'cascade' }),
+    id: text('id').notNull(),
+    itemIds: jsonb('item_ids').$type<string[]>().notNull(),
+    model: text('model'),
+    modelName: text('model_name').notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true, mode: 'string' }).notNull(),
+    firstTokenMs: integer('first_token_ms'),
+    durationMs: integer('duration_ms').notNull(),
+    inputTokens: integer('input_tokens'),
+    outputTokens: integer('output_tokens'),
+    cacheReadTokens: integer('cache_read_tokens'),
+    cacheWriteTokens: integer('cache_write_tokens'),
+    /** Level the call was asked for (`ReasoningLevel`); `null` when the provider decided. */
+    reasoning: text('reasoning'),
+  },
+  (t) => [primaryKey({ columns: [t.conversationId, t.id] })],
 )
 
 export const blobs = pgTable('blobs', {

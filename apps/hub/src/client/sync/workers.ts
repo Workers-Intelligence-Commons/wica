@@ -2,7 +2,7 @@
 // Object, shared by the collections of that conversation; the list of conversations is read
 // again every 30 s and after the tab's own actions, with the heads the open sockets report.
 
-import type { ChunkRow, ConversationRow, ItemShapeRow } from '../../shared/rows.ts'
+import type { ChunkRow, ConversationRow, ItemShapeRow, ModelCallRow } from '../../shared/rows.ts'
 import { type LiveFrame, livePath } from '../../shared/live.ts'
 
 export const LIST_REFRESH_MS = 30_000
@@ -17,14 +17,14 @@ const chunkKey = (row: Pick<ChunkRow, 'item_id' | 'idx'>) => `${row.item_id}:${r
 
 type Listener =
   | { items: (batch: RowBatch<ItemShapeRow>) => void }
-  | {
-      chunks: (batch: RowBatch<ChunkRow>) => void
-    }
+  | { chunks: (batch: RowBatch<ChunkRow>) => void }
+  | { calls: (batch: RowBatch<ModelCallRow>) => void }
 
 /** Socket of one conversation, with the rows it delivered; it reconnects until released. */
 class LiveConversation {
   readonly items = new Map<string, ItemShapeRow>()
   readonly chunks = new Map<string, ChunkRow>()
+  readonly calls = new Map<string, ModelCallRow>()
   head: string | null = null
   #ready = false
   #users = 0
@@ -101,12 +101,15 @@ class LiveConversation {
   #receive(frame: LiveFrame) {
     const itemChanges: Change<ItemShapeRow>[] = []
     const chunkChanges: Change<ChunkRow>[] = []
+    const callChanges: Change<ModelCallRow>[] = []
     switch (frame.t) {
       case 'snapshot':
         this.items.clear()
         this.chunks.clear()
+        this.calls.clear()
         for (const row of frame.items) this.items.set(row.id, row)
         for (const row of frame.chunks) this.chunks.set(chunkKey(row), row)
+        for (const row of frame.calls) this.calls.set(row.id, row)
         this.#ready = true
         this.#setHead(frame.head)
         for (const listener of this.#listeners) this.#deliver(listener)
@@ -132,6 +135,12 @@ class LiveConversation {
           this.chunks.delete(key)
         }
         break
+      case 'calls':
+        for (const row of frame.rows) {
+          callChanges.push({ type: this.calls.has(row.id) ? 'update' : 'insert', value: row })
+          this.calls.set(row.id, row)
+        }
+        break
       case 'head':
         this.#setHead(frame.head)
         return
@@ -140,13 +149,15 @@ class LiveConversation {
       if ('items' in listener && itemChanges.length > 0) listener.items({ changes: itemChanges })
       if ('chunks' in listener && chunkChanges.length > 0)
         listener.chunks({ changes: chunkChanges })
+      if ('calls' in listener && callChanges.length > 0) listener.calls({ changes: callChanges })
     }
     if (frame.t === 'items') for (const row of frame.rows) this.#confirm(row.id)
   }
 
   #deliver(listener: Listener) {
     if ('items' in listener) listener.items({ snapshot: [...this.items.values()] })
-    else listener.chunks({ snapshot: [...this.chunks.values()] })
+    else if ('chunks' in listener) listener.chunks({ snapshot: [...this.chunks.values()] })
+    else listener.calls({ snapshot: [...this.calls.values()] })
   }
 
   #confirm(id: string) {
@@ -195,6 +206,19 @@ export function followItems(
 export function followChunks(conversationId: string, apply: (batch: RowBatch<ChunkRow>) => void) {
   const live = acquire(conversationId)
   const unsubscribe = live.subscribe({ chunks: apply })
+  return () => {
+    unsubscribe()
+    release(live)
+  }
+}
+
+/** Follows the completed model calls of a conversation through its socket. */
+export function followCalls(
+  conversationId: string,
+  apply: (batch: RowBatch<ModelCallRow>) => void,
+) {
+  const live = acquire(conversationId)
+  const unsubscribe = live.subscribe({ calls: apply })
   return () => {
     unsubscribe()
     release(live)

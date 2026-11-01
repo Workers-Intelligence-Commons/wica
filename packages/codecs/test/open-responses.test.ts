@@ -186,6 +186,32 @@ describe('Open Responses request', () => {
     ])
   })
 
+  // The service knows efforts, not the journal's levels: each level is sent as its effort, the
+  // ones the API lacks as the nearest, and the summary the host asked for stays.
+  it('sends the level of the request as the effort, keeping the summary of the options', () => {
+    const request = (reasoning?: 'off' | 'minimal' | 'high' | 'max') => ({
+      trigger: 'u1',
+      path: [item('u1', { kind: 'user_message', parts: [{ type: 'text', text: 'Hi' }] })],
+      tools: [],
+      ...(reasoning ? { reasoning } : {}),
+    })
+    const withSummary = {
+      ...options,
+      reasoning: { effort: 'low' as const, summary: 'auto' as const },
+    }
+    expect(toOpenResponsesRequest(request('high'), withSummary).reasoning).toEqual({
+      effort: 'high',
+      summary: 'auto',
+    })
+    expect(toOpenResponsesRequest(request(), withSummary).reasoning).toEqual({
+      effort: 'low',
+      summary: 'auto',
+    })
+    expect(toOpenResponsesRequest(request('off'), options).reasoning).toEqual({ effort: 'none' })
+    expect(toOpenResponsesRequest(request('minimal'), options).reasoning).toEqual({ effort: 'low' })
+    expect(toOpenResponsesRequest(request('max'), options).reasoning).toEqual({ effort: 'xhigh' })
+  })
+
   it('refuses a tool name that the specification forbids', () => {
     expect(() =>
       toOpenResponsesRequest({ trigger: 'u', path: [], tools: [spec('server.tool')] }, options),
@@ -307,6 +333,30 @@ describe('Open Responses stream', () => {
         },
       ])
     }
+  })
+
+  it('returns the token counts of the response, the cached tokens apart from the input', () => {
+    const raw = sse([
+      {
+        type: 'response.completed',
+        sequence_number: 0,
+        response: {
+          output: [],
+          usage: {
+            input_tokens: 1200,
+            output_tokens: 80,
+            input_tokens_details: { cached_tokens: 1000 },
+          },
+        },
+      },
+    ])
+    expect(decodeAll(raw, raw.length)).toEqual([
+      {
+        type: 'done',
+        message: { parts: [] },
+        usage: { input: 200, output: 80, cacheRead: 1000, cacheWrite: 0 },
+      },
+    ])
   })
 
   it('returns a provider failure', () => {

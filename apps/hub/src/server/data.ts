@@ -5,7 +5,7 @@
 import type { Credential as PiCredential } from '@earendil-works/pi-ai'
 import type { Envelope } from '@wica/protocol'
 
-import type { ChunkRow, ConversationRow, ItemShapeRow } from '../shared/rows.ts'
+import type { ChunkRow, ConversationRow, ItemShapeRow, ModelCallRow } from '../shared/rows.ts'
 import type { IdentityRepo } from './identity.ts'
 
 export const ADMIN_ROLE = 'admin'
@@ -33,6 +33,9 @@ export interface Accounts extends IdentityRepo {
   revokeApiKey(userId: string, id: string): Promise<boolean>
   /** Display name of the account; `null` when it does not exist. */
   displayName(userId: string): Promise<string | null>
+  /** Whether the account gives its conversations to the commons from now on. */
+  contributor(userId: string): Promise<boolean>
+  setContributor(userId: string, on: boolean): Promise<void>
 }
 
 export type ConversationEntry = {
@@ -57,9 +60,18 @@ export interface ConversationIndex {
   get(conversationId: string): Promise<ConversationEntry | null>
   /** Sets the title only while it is empty. */
   setTitleIfEmpty(conversationId: string, title: string): Promise<void>
+  /** Sets the model of the next turns (`null`: the default model). */
+  setModel(conversationId: string, model: string | null): Promise<void>
+  /** Marks the conversation as given to the commons, once: a later call keeps the first time. */
+  markContributed(conversationId: string): Promise<void>
   /** Conversations of an account, most recently changed first. */
   list(ownerId: string): Promise<ConversationRow[]>
   delete(conversationId: string): Promise<void>
+}
+
+/** The completed model calls of the conversations, written by the turns. */
+export interface ModelCalls {
+  record(call: ModelCallRow): Promise<void>
 }
 
 export type CommandOutcome =
@@ -80,9 +92,12 @@ export interface ConversationHost {
   /** Scheduled wake-up: the next turn of the conversation. */
   wake(conversationId: string): Promise<void>
   /** Rows of the journal for server rendering. */
-  read(
-    conversationId: string,
-  ): Promise<{ head: string | null; items: ItemShapeRow[]; chunks: ChunkRow[] }>
+  read(conversationId: string): Promise<{
+    head: string | null
+    items: ItemShapeRow[]
+    chunks: ChunkRow[]
+    calls: ModelCallRow[]
+  }>
   /** Erases the journal and everything the turns kept for it; the index entry stays. */
   erase(conversationId: string): Promise<void>
 }

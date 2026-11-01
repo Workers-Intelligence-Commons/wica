@@ -1,7 +1,7 @@
 // Deterministic item identifiers. The client and the server run this same code: a difference of
 // a single byte in the serialization would give two different identifiers for the same message.
 
-import type { Origin, Part } from './journal.ts'
+import type { Origin, Part, ReasoningLevel } from './journal.ts'
 
 /**
  * Canonical serialization: object keys sorted by UTF-16 code units, numbers and strings written
@@ -139,6 +139,7 @@ export type UserMessageIdInput = {
   parentId: string | null
   from: Pick<Origin, 'channel' | 'author'>
   parts: Part[]
+  reasoning?: ReasoningLevel
 }
 
 /** Identifier of a `user_message`, computed identically by the client and the server. */
@@ -152,6 +153,9 @@ export function userMessageId(input: UserMessageIdInput): string {
     input.from.author ?? null,
     // A file enters by its hash: the same data under two addresses stays the same message.
     input.parts.map((p) => (p.type === 'file' ? { type: 'file', sha256: p.sha256 } : p)),
+    // A level enters only when chosen: a message without one hashes the same as from a client
+    // that knows no levels.
+    ...(input.reasoning ? [input.reasoning] : []),
   ])
 }
 

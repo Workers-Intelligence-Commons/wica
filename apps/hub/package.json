@@ -20,6 +20,7 @@
   "dependencies": {
     "@earendil-works/pi-ai": "1.4.0",
     "@electric-sql/client": "1.5.28",
+    "@lobehub/icons-static-svg": "1.101.0",
     "@modelcontextprotocol/client": "2.4.0",
     "@tanstack/browser-db-sqlite-persistence": "1.0.0-rc.1.1",
     "@tanstack/db": "1.0.0-rc.1.1",

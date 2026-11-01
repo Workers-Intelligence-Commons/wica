@@ -4,7 +4,13 @@
 
 import { type CollectionConfig, collectionOptions, type DbClient } from '@tanstack/react-db'
 
-import type { ChunkRow, ConversationRow, ItemShapeRow, ShapeTable } from '../shared/rows.ts'
+import type {
+  ChunkRow,
+  ConversationRow,
+  ItemShapeRow,
+  ModelCallRow,
+  ShapeTable,
+} from '../shared/rows.ts'
 import { type CacheFile, cacheName } from './cache.ts'
 import { collectionSync } from './sync/index.ts'
 
@@ -120,6 +126,19 @@ export const chunksCollection = perConversation((conversationId) =>
       `chunks:${conversationId}`,
       'item_chunks',
       (r) => `${r.item_id}:${r.idx}`,
+      conversationFile(client, conversationId),
+      conversationId,
+    ),
+  ),
+)
+
+export const callsCollection = perConversation((conversationId) =>
+  collectionOptions(`calls:${conversationId}`, (client) =>
+    synced<ModelCallRow>(
+      client,
+      `calls:${conversationId}`,
+      'model_calls',
+      (r) => r.id,
       conversationFile(client, conversationId),
       conversationId,
     ),

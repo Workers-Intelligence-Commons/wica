@@ -11,7 +11,7 @@ import type { Item, ModelRequest } from '@wica/core'
 import { type ModelScenario, modelAdapterConformance } from '@wica/testing'
 import { describe, expect, it } from 'vite-plus/test'
 
-import { fromPiMessage, piModel, toPiContext } from '../src/index.ts'
+import { fromPiMessage, piModel, piReasoning, toPiContext } from '../src/index.ts'
 
 function faux(scenario: ModelScenario) {
   const handle = fauxProvider({ tokensPerSecond: scenario === 'endless' ? 20 : 100_000 })
@@ -148,5 +148,41 @@ describe('model-pi', () => {
       })(),
     ).rejects.toThrow()
     expect(warnings).toEqual([model.provider])
+  })
+
+  it('gives the host the token counts that pi-ai reports for the response', async () => {
+    const { models, model } = faux('text')
+    const usages: unknown[] = []
+    const adapter = piModel({
+      models,
+      provider: model.provider,
+      model: model.id,
+      onUsage: (usage) => void usages.push(usage),
+    })
+    const request: ModelRequest = {
+      trigger: 'i1',
+      path: [item(1, null, { kind: 'user_message', parts: [{ type: 'text', text: 'Hello' }] })],
+      tools: [],
+    }
+    for await (const _ of adapter.stream(request, new AbortController().signal));
+    // The faux provider counts 4 characters a token: "user:Hello" in, "Hello." out.
+    expect(usages).toEqual([{ input: 3, output: 2, cacheRead: 0, cacheWrite: 0 }])
+  })
+
+  // A level the model lacks is sent as the nearest one it has; `off` and a model that does not
+  // reason send no level, which pi-ai reads as no reasoning.
+  it('sends the nearest level the model supports, and none for off', () => {
+    const { model } = faux('text')
+    const reasoner = {
+      ...model,
+      reasoning: true,
+      thinkingLevelMap: { minimal: null, xhigh: null, max: null },
+    }
+    expect(piReasoning(reasoner, 'high')).toBe('high')
+    expect(piReasoning(reasoner, 'max')).toBe('high')
+    expect(piReasoning(reasoner, 'minimal')).toBe('low')
+    expect(piReasoning(reasoner, 'off')).toBeUndefined()
+    expect(piReasoning(reasoner, undefined)).toBeUndefined()
+    expect(piReasoning({ ...model, reasoning: false }, 'high')).toBeUndefined()
   })
 })

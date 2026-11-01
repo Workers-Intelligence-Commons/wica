@@ -8,6 +8,20 @@
       "when": 1793487162642,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793544027312,
+      "tag": "0001_model_calls",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793549735815,
+      "tag": "0002_model_call_reasoning",
+      "breakpoints": true
     }
   ]
 }

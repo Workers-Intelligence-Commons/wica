@@ -60,6 +60,18 @@ describe('userMessageId', () => {
     expect(userMessageId({ ...base, salt: 'salt-2' })).not.toBe(id)
   })
 
+  // Clients that know no levels compute the identifiers of their messages without one: a level
+  // must change the identifier only when it is chosen.
+  it('changes with a chosen reasoning level, and only then', () => {
+    const id = userMessageId(base)
+    // Computed by the code from before levels existed.
+    expect(id).toBe('d0ffff2b-cc0b-84c6-a5f8-48bdbbd894c6')
+    expect(userMessageId({ ...base, reasoning: 'high' })).not.toBe(id)
+    expect(userMessageId({ ...base, reasoning: 'high' })).not.toBe(
+      userMessageId({ ...base, reasoning: 'low' }),
+    )
+  })
+
   it('takes a file by its hash, not by its address', () => {
     const file = (uri: string) => ({
       ...base,

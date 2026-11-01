@@ -3,7 +3,14 @@
 // `payload` carries the item; `seq`, `status` and `parent_id` have their own columns, which are
 // the source of truth.
 
-import { canonicalJson, type Item, type ItemDraft, type Part, sha256 } from '@wica/core'
+import {
+  canonicalJson,
+  type Item,
+  type ItemDraft,
+  type Part,
+  type ReasoningLevel,
+  sha256,
+} from '@wica/core'
 
 export type ItemRow = {
   conversation_id: string
@@ -35,8 +42,33 @@ export type ConversationRow = {
   updated_at: string
 }
 
+/**
+ * One model call that completed: the model that answered, its timings measured by the hub, its
+ * tokens as the provider reports them (`null` when it reports none), and the items it wrote.
+ */
+export type ModelCallRow = {
+  conversation_id: string
+  id: string
+  /** Items the call wrote: its texts, reasoning and tool calls. */
+  item_ids: string[]
+  /** As `conversations.model`: `null` for the default model of the instance. */
+  model: string | null
+  /** Name of the model when it answered. */
+  model_name: string
+  started_at: string
+  /** From the request to the first text or reasoning; `null` when none came before the end. */
+  first_token_ms: number | null
+  duration_ms: number
+  input_tokens: number | null
+  output_tokens: number | null
+  cache_read_tokens: number | null
+  cache_write_tokens: number | null
+  /** Level the call was asked for; `null` when the provider decided. */
+  reasoning: ReasoningLevel | null
+}
+
 /** The synchronized tables, as the browser collections and server rendering name them. */
-export type ShapeTable = 'conversations' | 'items' | 'item_chunks'
+export type ShapeTable = 'conversations' | 'items' | 'item_chunks' | 'model_calls'
 
 export const rowToItem = (row: Pick<ItemRow, 'id' | 'parent_id' | 'seq' | 'status' | 'payload'>) =>
   ({

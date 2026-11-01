@@ -1,4 +1,4 @@
-import type { Item } from './journal.ts'
+import type { Item, ReasoningLevel } from './journal.ts'
 
 export type JSONSchema = Record<string, unknown> | boolean
 
@@ -38,6 +38,8 @@ export type ModelRequest = {
   tools: ToolSpec[]
   /** Host instructions for the model, outside the journal. */
   instructions?: string
+  /** Level chosen with the last message of a person on `path`; absent, the provider decides. */
+  reasoning?: ReasoningLevel
   /**
    * Summary request: the model summarizes `path` without tools, and its text becomes the
    * `compacted` event of this range instead of a response.

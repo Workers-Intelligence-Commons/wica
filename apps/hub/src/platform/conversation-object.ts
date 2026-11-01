@@ -71,6 +71,7 @@ export class ConversationObject extends DurableObject<CloudflareEnv> implements 
       index,
       tokens,
       store: this.#store,
+      calls: { record: (call) => this.#store.recordCall(call) },
       sessions,
       scheduler,
       mcp: mcpAccess,

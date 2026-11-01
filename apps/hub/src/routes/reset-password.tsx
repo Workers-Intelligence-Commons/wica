@@ -44,7 +44,7 @@ function ResetPassword() {
 
   return (
     <main className="login">
-      <Mark name="wic" height={64} label="Workers' Intelligence Commons" />
+      <Mark name="hub" height={64} label="WIC hub" />
       <SectionHeading kicker="wica">Choose a new password</SectionHeading>
       {done ? (
         <p>Your password is replaced. Sign in with it.</p>

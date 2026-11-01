@@ -1,7 +1,7 @@
 // Conversation index on Postgres: the `conversations` rows that the routes own (owner, title,
 // model, salt). The journal columns of the same table belong to the `Store`.
 
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, isNull, sql } from 'drizzle-orm'
 
 import type { ConversationIndex } from '../data.ts'
 import { randomSalt, uuidv7 } from '../ids.ts'
@@ -38,6 +38,17 @@ export const pgConversationIndex = (db: Db): ConversationIndex => ({
       .update(c)
       .set({ title })
       .where(and(eq(c.id, conversationId), eq(c.title, '')))
+  },
+
+  async setModel(conversationId, model) {
+    await db.update(c).set({ model }).where(eq(c.id, conversationId))
+  },
+
+  async markContributed(conversationId) {
+    await db
+      .update(c)
+      .set({ contributedAt: sql`now()` })
+      .where(and(eq(c.id, conversationId), isNull(c.contributedAt)))
   },
 
   async list(ownerId) {

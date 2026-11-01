@@ -50,6 +50,27 @@
       "when": 1793528657127,
       "tag": "0006_token_lease",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793544016536,
+      "tag": "0007_model_calls",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793548096424,
+      "tag": "0008_contributor",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793549735358,
+      "tag": "0009_model_call_reasoning",
+      "breakpoints": true
     }
   ]
 }

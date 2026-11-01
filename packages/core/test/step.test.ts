@@ -73,6 +73,35 @@ describe('step', () => {
     expect(call.request.tools).toEqual(tools)
   })
 
+  // The person chooses a level with each message: it holds for the whole answer, tool follow-ups
+  // included, and a message sent without one leaves the level to the provider again.
+  it('asks each model call with the level of the last message, until a message without one', () => {
+    const h = host()
+    const level = (intents: Intent[]) =>
+      (intents.find((i) => i.t === 'call_model') as Extract<Intent, { t: 'call_model' }>).request
+        .reasoning
+    h.send({
+      t: 'user_message',
+      parentId: null,
+      parts: [{ type: 'text', text: 'Read a.txt' }],
+      reasoning: 'high',
+    })
+    expect(journal(h.state).at(-1)).toMatchObject({ kind: 'user_message', reasoning: 'high' })
+    expect(level(h.send({ t: 'resume' }))).toBe('high')
+    h.send({
+      t: 'model_done',
+      message: {
+        parts: [{ type: 'tool_call', callId: 'k1', tool: 'read_file', input: { path: 'a.txt' } }],
+      },
+    })
+    h.send({ t: 'resume' })
+    h.send({ t: 'tool_result', callId: 'k1', output: [{ type: 'text', text: 'content' }] })
+    expect(level(h.send({ t: 'resume' }))).toBe('high')
+    h.send({ t: 'model_done', message: { parts: [{ type: 'text', text: 'Done.' }] } })
+    h.send({ t: 'user_message', parentId: h.state.head, parts: [{ type: 'text', text: 'Thanks' }] })
+    expect(level(h.send({ t: 'resume' }))).toBeUndefined()
+  })
+
   it('writes the streaming text then settles it, and promotes the text of a response without a tool', () => {
     const h = host()
     h.send({ t: 'user_message', parentId: null, parts: [{ type: 'text', text: 'Hello' }] })

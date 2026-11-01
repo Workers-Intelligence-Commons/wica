@@ -9,6 +9,7 @@ import type {
   Delta,
   ModelRequest,
   Part,
+  ReasoningLevel,
   ToolSpec,
 } from '@wica/core'
 
@@ -39,6 +40,17 @@ export type FunctionTool = {
 }
 
 export type ReasoningEffort = 'none' | 'low' | 'medium' | 'high' | 'xhigh'
+
+/** Effort sent for each level: the API has no `minimal` nor `max`, the nearest level stands in. */
+export const EFFORTS: Record<ReasoningLevel, ReasoningEffort> = {
+  off: 'none',
+  minimal: 'low',
+  low: 'low',
+  medium: 'medium',
+  high: 'high',
+  xhigh: 'xhigh',
+  max: 'xhigh',
+}
 
 export type OpenResponsesRequest = {
   model: string
@@ -151,6 +163,10 @@ export function toOpenResponsesRequest(
     const item = inputItem(entry, options.provider)
     return item ? [item] : []
   })
+  // The level of the request replaces the effort of the options and keeps their summary.
+  const reasoning = request.reasoning
+    ? { ...options.reasoning, effort: EFFORTS[request.reasoning] }
+    : options.reasoning
   return {
     model: options.model,
     input,
@@ -159,7 +175,7 @@ export function toOpenResponsesRequest(
     stream: true,
     store: false,
     include: ['reasoning.encrypted_content'],
-    ...(options.reasoning ? { reasoning: options.reasoning } : {}),
+    ...(reasoning ? { reasoning } : {}),
     ...(options.maxOutputTokens !== undefined
       ? { max_output_tokens: options.maxOutputTokens }
       : {}),
@@ -167,9 +183,34 @@ export function toOpenResponsesRequest(
   }
 }
 
+/**
+ * Tokens of one response, as the provider counts them. `input` excludes the cached tokens, which
+ * `cacheRead` and `cacheWrite` count apart.
+ */
+export type ModelUsage = { input: number; output: number; cacheRead: number; cacheWrite: number }
+
+type ResponseUsage = {
+  input_tokens?: number
+  output_tokens?: number
+  input_tokens_details?: { cached_tokens?: number; cache_write_tokens?: number }
+}
+
+/** The usage of a response, when the service reports it: Open Responses counts cached tokens in `input_tokens`. */
+function toUsage(usage: ResponseUsage | null | undefined): ModelUsage | undefined {
+  if (!usage) return undefined
+  const cacheRead = usage.input_tokens_details?.cached_tokens ?? 0
+  const cacheWrite = usage.input_tokens_details?.cache_write_tokens ?? 0
+  return {
+    input: Math.max(0, (usage.input_tokens ?? 0) - cacheRead - cacheWrite),
+    output: usage.output_tokens ?? 0,
+    cacheRead,
+    cacheWrite,
+  }
+}
+
 export type DecodedChunk =
   | Delta
-  | { type: 'done'; message: AssistantMessage; incomplete?: string }
+  | { type: 'done'; message: AssistantMessage; incomplete?: string; usage?: ModelUsage }
   | { type: 'failed'; code: string | null; message: string }
 
 type OutputItem = {
@@ -263,6 +304,7 @@ export function createOpenResponsesDecoder(options: { provider: string }) {
           output?: OutputItem[]
           error?: { code?: string | null; message?: string } | null
           incomplete_details?: { reason?: string } | null
+          usage?: ResponseUsage | null
         }
         error?: { code?: string | null; message?: string }
       }
@@ -277,18 +319,25 @@ export function createOpenResponsesDecoder(options: { provider: string }) {
         case 'response.output_item.done':
           if (e.item && e.output_index !== undefined) items.set(e.output_index, e.item)
           return []
-        case 'response.completed':
+        case 'response.completed': {
           finished = true
-          return [{ type: 'done', message: message(e.response?.output) }]
-        case 'response.incomplete':
+          const usage = toUsage(e.response?.usage)
+          return [
+            { type: 'done', message: message(e.response?.output), ...(usage ? { usage } : {}) },
+          ]
+        }
+        case 'response.incomplete': {
           finished = true
+          const usage = toUsage(e.response?.usage)
           return [
             {
               type: 'done',
               message: message(e.response?.output),
               incomplete: e.response?.incomplete_details?.reason ?? 'unknown',
+              ...(usage ? { usage } : {}),
             },
           ]
+        }
         case 'response.failed':
           finished = true
           return [

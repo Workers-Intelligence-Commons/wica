@@ -35,9 +35,12 @@ import {
   trustedProxyAuth,
 } from './identity.ts'
 import {
+  INSTANCE_LEVELS,
   listProviders,
   loginFlow,
+  type ModelOption,
   parseModelChoice,
+  piLevels,
   testModelOptions,
   userModels,
 } from './models.ts'
@@ -55,7 +58,7 @@ import {
 } from './better-auth.ts'
 
 /** Tables that the pages sync. */
-export type SyncTable = 'conversations' | 'items' | 'item_chunks'
+export type SyncTable = 'conversations' | 'items' | 'item_chunks' | 'model_calls'
 
 /**
  * Rows that a request may read: those of `owner`, and of `conversationId` once the hub has checked
@@ -168,7 +171,13 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
       ...(harnessSession ? { harnessSession } : {}),
     })
     if (outcome.kind === 'conflict') return error(409, 'this id is already taken')
-    if (envelope.command.t === 'send') await autoTitle(conversation.id, envelope.command.parts)
+    if (envelope.command.t === 'send') {
+      await autoTitle(conversation.id, envelope.command.parts)
+      // A message accepted while its owner contributes gives the conversation, for good.
+      if (outcome.ack.ok && (await repo.contributor(principal.id))) {
+        await index.markContributed(conversation.id)
+      }
+    }
     const { ack, sessionId } = outcome
     return json(ack, ack.ok ? 200 : 422, sessionId ? { 'x-wica-session': sessionId } : {})
   }
@@ -188,16 +197,30 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
       title?: string
       model?: string | null
     }
-    const choice = body.model ? parseModelChoice(body.model) : null
-    if (body.model && (!choice || (choice.kind === 'lorem' && !config.testModels))) {
-      return error(400, 'unknown model')
-    }
+    if (!knownModel(body.model)) return error(400, 'unknown model')
     const created = await index.create({
       ownerId: principal.id,
       title: body.title ?? '',
       model: body.model ?? null,
     })
     return json(created, 201)
+  }
+
+  /** A model a conversation may use: absent or `null` is the default model. */
+  function knownModel(model: string | null | undefined) {
+    if (!model) return true
+    const choice = parseModelChoice(model)
+    return choice !== null && !(choice.kind === 'lorem' && !config.testModels)
+  }
+
+  /** Changes the model of the next turns; the responses already written keep theirs. */
+  async function updateConversation(req: Request, principal: Principal, conversationId: string) {
+    const row = await ownConversation(principal, conversationId)
+    if (!row) return error(404, 'conversation not found')
+    const body = (await req.json().catch(() => ({}))) as { model?: string | null }
+    if (!('model' in body) || !knownModel(body.model)) return error(400, 'unknown model')
+    await index.setModel(conversationId, body.model ?? null)
+    return new Response(null, { status: 204 })
   }
 
   async function deleteConversation(principal: Principal, conversationId: string) {
@@ -259,13 +282,26 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
   async function modelsRoute(principal: Principal) {
     const { models } = userModels(tokens, principal.id)
     const available = await models.getAvailable().catch(() => [])
+    const providerNames = new Map(models.getProviders().map((p) => [p.id, p.name]))
     return json({
-      default: config.model ? { id: null, name: config.model.id } : null,
+      default: config.model
+        ? ({
+            id: null,
+            name: config.model.id,
+            group: 'This instance',
+            provider: 'wic',
+            levels: INSTANCE_LEVELS,
+          } satisfies ModelOption)
+        : null,
       models: [
         ...(config.testModels ? testModelOptions() : []),
-        ...available.map((m) => ({
+        ...available.map((m): ModelOption => ({
           id: `pi:${m.provider}/${m.id}`,
-          name: `${m.provider} · ${m.name}`,
+          name: m.name,
+          group: providerNames.get(m.provider) ?? m.provider,
+          provider: m.provider,
+          slug: `${m.provider}/${m.id}`,
+          levels: piLevels(m),
         })),
       ],
     })
@@ -363,7 +399,7 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
     if (section === 'shapes' && platform.rows) {
       const table = rest[0]
       if (table === 'conversations') return platform.rows(req, table, { owner: principal.id })
-      if (table === 'items' || table === 'item_chunks') {
+      if (table === 'items' || table === 'item_chunks' || table === 'model_calls') {
         const conversation = await ownConversation(principal, url.searchParams.get('conversation'))
         if (!conversation) return error(404, 'conversation not found')
         return platform.rows(req, table, { owner: principal.id, conversationId: conversation.id })
@@ -382,6 +418,9 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
     if (section === 'conversations' && rest.length === 0 && req.method === 'POST') {
       return createConversation(req, principal)
     }
+    if (section === 'conversations' && rest[0] && req.method === 'PATCH') {
+      return updateConversation(req, principal, rest[0])
+    }
     if (section === 'conversations' && rest[0] && req.method === 'DELETE') {
       return deleteConversation(principal, rest[0])
     }
@@ -390,7 +429,22 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
     if (section === 'mcp') return mcpRoute(req, principal, rest)
     if (section === 'skills') return skillsRoute(req, principal, rest[0])
     if (section === 'keys') return keysRoute(req, principal, rest[0])
+    if (section === 'contributor') return contributorRoute(req, principal)
     return error(404, 'unknown route')
+  }
+
+  /**
+   * Whether the account gives its conversations to the commons. Giving is the person's own act:
+   * only a browser session changes it, never a key.
+   */
+  async function contributorRoute(req: Request, principal: Principal) {
+    if (req.method === 'GET') return json({ on: await repo.contributor(principal.id) })
+    if (req.method !== 'PUT') return error(404, 'unknown route')
+    if (principal.kind !== 'user') return error(403, 'a browser session was expected')
+    const body = (await req.json().catch(() => ({}))) as { on?: unknown }
+    if (typeof body.on !== 'boolean') return error(400, 'on: a boolean was expected')
+    await repo.setContributor(principal.id, body.on)
+    return json({ on: body.on })
   }
 
   /**
@@ -584,13 +638,13 @@ export function hubServer(config: HubConfig, data: HubData, platform: Platform) 
     if (!connection || connection.userId !== principal.id)
       return error(404, 'tool server not found')
     const code = url.searchParams.get('code')
-    if (!code) return redirect('/settings?toolServer=refused')
+    if (!code) return redirect('/?settings=tools&toolServer=refused')
     try {
       await mcp.finishSignIn(connection, code, url.searchParams.get('iss'))
     } catch {
-      return redirect('/settings?toolServer=failed')
+      return redirect('/?settings=tools&toolServer=failed')
     }
-    return redirect('/settings?toolServer=connected')
+    return redirect('/?settings=tools&toolServer=connected')
   }
 
   /** Administration, for the admin token and the accounts with the admin role. */

@@ -8,6 +8,7 @@ import { and, asc, eq, inArray, notExists, sql } from 'drizzle-orm'
 import type { ConversationHost } from '../data.ts'
 import type { ConversationTurns } from '../turns.ts'
 import type { Db } from './db.ts'
+import { pgCallRows } from './model-calls.ts'
 import {
   blobs,
   commands,
@@ -15,6 +16,7 @@ import {
   conversationWriters,
   itemChunks,
   items,
+  modelCalls,
   snapshots,
   toolClaims,
   wakeups,
@@ -93,12 +95,14 @@ export function pgConversationHost(db: Db, turns: ConversationTurns): Conversati
         head: conversation?.head ?? null,
         items: rows.map((r) => ({ ...r, payload: r.payload as Record<string, unknown> })),
         chunks,
+        calls: await pgCallRows(db, conversationId),
       }
     },
 
     async erase(conversationId) {
       await db.transaction(async (tx) => {
         await tx.delete(items).where(eq(items.conversationId, conversationId))
+        await tx.delete(modelCalls).where(eq(modelCalls.conversationId, conversationId))
         for (const table of [snapshots, toolClaims, commands, wakeups, conversationWriters]) {
           await tx.delete(table).where(eq(table.conversationId, conversationId))
         }

@@ -1,7 +1,7 @@
 // Conversation index on D1: the list of conversations, their owner, title, model and salt. The
 // head and the time of the last change are copied from the journal after each turn.
 
-import { and, desc, eq } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 
 import type { ConversationIndex } from '../data.ts'
 import { randomSalt, uuidv7 } from '../ids.ts'
@@ -34,6 +34,17 @@ export const d1ConversationIndex = (db: D1Db): D1ConversationIndex => ({
       .update(c)
       .set({ title })
       .where(and(eq(c.id, conversationId), eq(c.title, '')))
+  },
+
+  async setModel(conversationId, model) {
+    await db.update(c).set({ model }).where(eq(c.id, conversationId))
+  },
+
+  async markContributed(conversationId) {
+    await db
+      .update(c)
+      .set({ contributedAt: new Date().toISOString() })
+      .where(and(eq(c.id, conversationId), isNull(c.contributedAt)))
   },
 
   async list(ownerId) {

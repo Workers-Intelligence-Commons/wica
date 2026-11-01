@@ -27,6 +27,8 @@ export const users = sqliteTable('users', {
   displayName: text('display_name').notNull(),
   /** Roles on the instance: `admin` reaches the administration. */
   roles: list('roles'),
+  /** Gives the conversations to the commons from now on (CC0); off until the person turns it on. */
+  contributor: integer('contributor', { mode: 'boolean' }).notNull().default(false),
   createdAt: createdAt(),
 })
 
@@ -98,6 +100,11 @@ export const conversations = sqliteTable(
     model: text('model'),
     headItemId: text('head_item_id'),
     idSalt: text('id_salt').notNull(),
+    /**
+     * When the conversation was given to the commons under CC0: set by the first message sent
+     * while its owner contributes, and never cleared, since the dedication cannot be withdrawn.
+     */
+    contributedAt: text('contributed_at'),
     createdAt: createdAt(),
     updatedAt: text('updated_at').notNull().default(now),
   },

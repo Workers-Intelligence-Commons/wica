@@ -4,7 +4,7 @@
 // Writing never goes through the sync.
 
 import { createTransaction } from '@tanstack/react-db'
-import { type Part, userMessageId } from '@wica/core'
+import { type Part, type ReasoningLevel, userMessageId } from '@wica/core'
 import type { Command, Envelope } from '@wica/protocol'
 
 import { markPending } from './cache.ts'
@@ -98,21 +98,26 @@ export async function sendMessage(options: {
   salt: string
   parentId: string | null
   parts: Part[]
+  /** Level chosen for the answer; absent, the provider decides. */
+  reasoning?: ReasoningLevel | null
   /** Provisional `seq`, after the last known item. */
   seq: number
 }): Promise<string> {
   const from = { channel: 'web', author: options.account }
+  const level = options.reasoning ? { reasoning: options.reasoning } : {}
   const id = userMessageId({
     salt: options.salt,
     conversationId: options.conversationId,
     parentId: options.parentId,
     from,
     parts: options.parts,
+    ...level,
   })
   const env = envelope(options.conversationId, {
     t: 'send',
     parentId: options.parentId,
     parts: options.parts,
+    ...level,
   })
   const confirm = rowConfirmation(options.items, options.conversationId)
   if (!confirm) throw new CommandError('this collection has no sync, so the message cannot be sent')
@@ -145,6 +150,7 @@ export async function sendMessage(options: {
         kind: 'user_message',
         parts: options.parts,
         from: { ...from, trust: 'owner' },
+        ...level,
       },
     })
   })

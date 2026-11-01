@@ -17,6 +17,7 @@ import type {
   ItemDraft,
   Origin,
   Part,
+  ReasoningLevel,
   Trust,
   Wakeup,
 } from './journal.ts'
@@ -35,7 +36,13 @@ import {
 import { pathTo } from './tree.ts'
 
 type EventBody =
-  | { t: 'user_message'; parentId: string | null; parts: Part[]; from?: Origin }
+  | {
+      t: 'user_message'
+      parentId: string | null
+      parts: Part[]
+      from?: Origin
+      reasoning?: ReasoningLevel
+    }
   | { t: 'model_delta'; delta: Delta }
   | { t: 'model_done'; message: AssistantMessage }
   | { t: 'model_failed'; error: string }
@@ -413,6 +420,8 @@ function resume(s: State, at: string): Step {
     }
   }
 
+  const requestPath = pathTo(all(current), current.head) as Item[]
+  const reasoning = reasoningOf(requestPath)
   return {
     state: { ...current, stream: { trigger: last.id, tip: current.head, nextRank: 0, open: [] } },
     intents: [
@@ -421,12 +430,22 @@ function resume(s: State, at: string): Step {
         t: 'call_model',
         request: {
           trigger: last.id,
-          path: pathTo(all(current), current.head) as Item[],
+          path: requestPath,
           tools: current.tools,
+          ...(reasoning ? { reasoning } : {}),
         },
       },
     ],
   }
+}
+
+/**
+ * Level of the last message of a person on the path: it holds for the answer, the follow-ups of
+ * its tools and the wake-ups after it, until the person sends another message.
+ */
+export function reasoningOf(path: readonly Item[]): ReasoningLevel | undefined {
+  const message = path.findLast((i) => i.kind === 'user_message')
+  return message?.kind === 'user_message' ? message.reasoning : undefined
 }
 
 /**
@@ -820,11 +839,13 @@ export function step(state: State, event: Event): Step {
         parentId: event.parentId,
         from: event.from ?? { channel: 'default' },
         parts: event.parts,
+        ...(event.reasoning ? { reasoning: event.reasoning } : {}),
       })
       const item = draft(id, event.parentId, event.at, 'done', {
         kind: 'user_message',
         parts: event.parts,
         ...(event.from ? { from: event.from } : {}),
+        ...(event.reasoning ? { reasoning: event.reasoning } : {}),
       })
       if (has(state, id)) return { state: { ...state, head: id }, intents: [] }
       return append(state, [item], [])

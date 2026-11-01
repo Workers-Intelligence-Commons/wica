@@ -61,3 +61,20 @@ export const commands = sqliteTable('commands', {
   kind: text('kind').notNull(),
   ack: text('ack', { mode: 'json' }),
 })
+
+/** Completed model calls, with their measures (`ModelCallRow`), as on Postgres. */
+export const modelCalls = sqliteTable('model_calls', {
+  id: text('id').primaryKey(),
+  itemIds: text('item_ids', { mode: 'json' }).$type<string[]>().notNull(),
+  model: text('model'),
+  modelName: text('model_name').notNull(),
+  startedAt: text('started_at').notNull(),
+  firstTokenMs: integer('first_token_ms'),
+  durationMs: integer('duration_ms').notNull(),
+  inputTokens: integer('input_tokens'),
+  outputTokens: integer('output_tokens'),
+  cacheReadTokens: integer('cache_read_tokens'),
+  cacheWriteTokens: integer('cache_write_tokens'),
+  /** Level the call was asked for (`ReasoningLevel`); `null` when the provider decided. */
+  reasoning: text('reasoning'),
+})

@@ -21,10 +21,11 @@ import { renderAnswer, userTools } from '@wica/tools-user'
 
 import type { HubConfig } from './config.ts'
 import { sign, verify } from './crypto.ts'
-import type { ConversationIndex, Skills } from './data.ts'
+import type { ConversationIndex, ModelCalls, Skills } from './data.ts'
 import type { ModelTokens } from './tokens.ts'
 import type { McpAccess } from './mcp.ts'
-import { conversationModel, parseModelChoice } from './models.ts'
+import { measuredModel } from './model-calls.ts'
+import { conversationModel, modelName, parseModelChoice } from './models.ts'
 import { oneShot } from './one-shot.ts'
 import { CREATE_SKILL_TOOL, createSkillQuestion, createSkillTool, turnSkills } from './skills.ts'
 
@@ -56,6 +57,8 @@ export type TurnDeps = {
   index: ConversationIndex
   tokens: ModelTokens
   store: Store
+  /** Where the measures of the completed model calls go. */
+  calls: ModelCalls
   sessions: SessionStore
   scheduler: Scheduler
   /** Tool servers of the conversation owner, connected for each wake-up. */
@@ -102,7 +105,15 @@ export function conversationTurns(deps: TurnDeps) {
     let model: ModelAdapter
     try {
       if (!choice) throw new Error(`Unknown model: ${entry?.model}`)
-      model = conversationModel(config, deps.tokens, entry?.ownerId ?? null, choice)
+      const owner = entry?.ownerId ?? null
+      model = measuredModel({
+        conversationId,
+        model: entry?.model ?? null,
+        modelName: modelName(config, deps.tokens, owner, choice),
+        adapter: (onUsage) => conversationModel(config, deps.tokens, owner, choice, onUsage),
+        store: deps.store,
+        calls: deps.calls,
+      })
     } catch (e) {
       model = unavailableModel(e instanceof Error ? e.message : String(e))
     }

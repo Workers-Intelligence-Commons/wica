@@ -5,11 +5,14 @@
 import {
   createOpenResponsesDecoder,
   createSseDecoder,
+  type ModelUsage,
   type RequestOptions,
   toOpenResponsesRequest,
 } from '@wica/codecs'
 import type { ModelRequest } from '@wica/core'
 import type { ModelAdapter, ModelChunk } from '@wica/runtime'
+
+export type { ModelUsage } from '@wica/codecs'
 
 export type OpenResponsesModelOptions = {
   /** Base address of the API, for example `http://localhost:8000/v1`. */
@@ -26,6 +29,8 @@ export type OpenResponsesModelOptions = {
   /** Retries of a request that fails before the stream starts; 3 by default. */
   retries?: number
   fetch?: typeof fetch
+  /** Tokens of each response, when the service reports them; called before its final chunk. */
+  onUsage?: (usage: ModelUsage) => void
 }
 
 /** Failure of the model service, after retries. */
@@ -146,8 +151,10 @@ export function openResponsesModel(options: OpenResponsesModelOptions): ModelAda
             for (const chunk of decoder.push(JSON.parse(message.data))) {
               if (chunk.type === 'failed')
                 throw new ModelError(chunk.message, undefined, chunk.code)
-              if (chunk.type === 'done') yield { type: 'done', message: chunk.message }
-              else yield chunk
+              if (chunk.type === 'done') {
+                if (chunk.usage) options.onUsage?.(chunk.usage)
+                yield { type: 'done', message: chunk.message }
+              } else yield chunk
             }
           }
           if (decoder.finished) break

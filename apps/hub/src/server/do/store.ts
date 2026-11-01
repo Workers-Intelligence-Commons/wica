@@ -3,7 +3,7 @@
 // the same transaction. Once a write is committed, its rows leave as live frames for the sockets
 // of the conversation.
 
-import type { ItemDraft, Part } from '@wica/core'
+import type { ItemDraft, Part, ReasoningLevel } from '@wica/core'
 import { type Claim, type Snapshot, StaleEpochError, type Store } from '@wica/runtime'
 import { asc, eq, gt, inArray, isNull, lte, or, sql } from 'drizzle-orm'
 import type { DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite'
@@ -13,10 +13,19 @@ import {
   type ChunkRow,
   draftToRow,
   type ItemShapeRow,
+  type ModelCallRow,
   restoreItem,
   rowToItem,
 } from '../../shared/rows.ts'
-import { commands, conversation, itemChunks, items, snapshot, toolClaims } from './schema.ts'
+import {
+  commands,
+  conversation,
+  itemChunks,
+  items,
+  modelCalls,
+  snapshot,
+  toolClaims,
+} from './schema.ts'
 
 export type DoDb = DrizzleSqliteDODatabase
 type Tx = Parameters<Parameters<DoDb['transaction']>[0]>[0]
@@ -68,7 +77,27 @@ export function journalRows(db: DoDb, conversationId: string) {
           .all()
           .map((c) => ({ conversation_id: conversationId, ...c }))
   const shaped: ItemShapeRow[] = rows.map((r) => ({ conversation_id: conversationId, ...r }))
-  return { head, items: shaped, chunks }
+  const calls: ModelCallRow[] = db
+    .select()
+    .from(modelCalls)
+    .orderBy(asc(modelCalls.startedAt))
+    .all()
+    .map((r) => ({
+      conversation_id: conversationId,
+      id: r.id,
+      item_ids: r.itemIds,
+      model: r.model,
+      model_name: r.modelName,
+      started_at: r.startedAt,
+      first_token_ms: r.firstTokenMs,
+      duration_ms: r.durationMs,
+      input_tokens: r.inputTokens,
+      output_tokens: r.outputTokens,
+      cache_read_tokens: r.cacheReadTokens,
+      cache_write_tokens: r.cacheWriteTokens,
+      reasoning: r.reasoning as ReasoningLevel | null,
+    }))
+  return { head, items: shaped, chunks, calls }
 }
 
 export class DoStore implements Store {
@@ -88,6 +117,29 @@ export class DoStore implements Store {
     this.#db = db
     this.#salt = salt
     this.#emit = emit
+  }
+
+  /** Keeps a completed model call, then sends it to the sockets of the conversation. */
+  async recordCall(call: ModelCallRow) {
+    this.#db
+      .insert(modelCalls)
+      .values({
+        id: call.id,
+        itemIds: call.item_ids,
+        model: call.model,
+        modelName: call.model_name,
+        startedAt: call.started_at,
+        firstTokenMs: call.first_token_ms,
+        durationMs: call.duration_ms,
+        inputTokens: call.input_tokens,
+        outputTokens: call.output_tokens,
+        cacheReadTokens: call.cache_read_tokens,
+        cacheWriteTokens: call.cache_write_tokens,
+        reasoning: call.reasoning,
+      })
+      .onConflictDoNothing()
+      .run()
+    this.#emit({ t: 'calls', rows: [call] })
   }
 
   /** Creates the row of the conversation, with its salt, if it is missing. */

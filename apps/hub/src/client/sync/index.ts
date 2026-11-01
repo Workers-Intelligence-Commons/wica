@@ -35,9 +35,9 @@ function workersSync<T extends Row>(table: ShapeTable, conversationId?: string) 
       const apply = applier(params) as unknown as (batch: workers.RowBatch<unknown>) => void
       if (table === 'conversations') return workers.followList(apply, params.reportError)
       if (!conversationId) throw new Error(`${table} needs a conversation`)
-      return table === 'items'
-        ? workers.followItems(conversationId, apply)
-        : workers.followChunks(conversationId, apply)
+      if (table === 'items') return workers.followItems(conversationId, apply)
+      if (table === 'model_calls') return workers.followCalls(conversationId, apply)
+      return workers.followChunks(conversationId, apply)
     },
   }
 }

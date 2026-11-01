@@ -58,43 +58,71 @@ pre {
   color: var(--red-ink);
 }
 
-/* Layout: the conversation sidebar and the main area. */
+/* Layout: the page fills the window under its top bar; the drawer of the conversations and the
+   dialogs are pasted over it. Pages read in one centered column, at most 760px wide, while their
+   scroll stays at the edge of the window. */
 
 .app {
-  display: grid;
-  grid-template-columns: 300px 1fr;
+  display: flex;
+  flex-direction: column;
   height: 100dvh;
 }
 
-.sidebar {
+.conversation,
+.page {
+  --column: 760px;
+  --gutter: max(var(--space-4), calc((100% - var(--column)) / 2));
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  flex: 1;
   min-height: 0;
-  padding: var(--space-4) var(--space-3);
-  border-right: 1px solid var(--line);
-  background: var(--paper);
 }
 
-.sidebar-head {
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.topbar-title h1 {
+  margin: 0;
+  min-width: 0;
+  font-family: var(--font-gothic);
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 24px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.drawer-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  padding: 0 var(--space-1);
+  padding: 0 var(--space-1) var(--space-4);
 }
 
-.sidebar .wic-conversations {
+.wic-dialog-side .wic-conversations {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
 }
 
-.sidebar .wic-conversation-link.enter {
-  animation: enter 180ms ease-out both;
-}
-
-.sidebar-foot {
+.drawer-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -116,46 +144,45 @@ pre {
   white-space: nowrap;
 }
 
-.main {
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-/* Conversation */
-
-.conversation {
-  display: flex;
-  flex-direction: column;
+.page-body {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-8) var(--gutter);
+}
+
+/* Conversation: a poster pasted on the wall under the top bar. The messages, the error line and
+   the composer share its sheet, which scrolls inside while the sheet stays on the wall. */
+
+.chat-sheet {
+  --gutter: var(--space-8);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(calc(100% - 2 * var(--space-4)), calc(var(--column) + 2 * var(--space-8)));
+  margin: var(--space-4) auto;
 }
 
 .conversation .wic-messages {
   flex: 1;
   min-height: 0;
+  padding-inline: var(--gutter);
 }
 
-.conversation-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 64px;
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--line);
+.conversation .wic-composer,
+.chat-sheet > .failure {
+  padding-inline: var(--gutter);
 }
 
-.conversation-head h1 {
-  margin: 0 auto 0 0;
-  font-family: var(--font-gothic);
-  font-weight: 800;
-  font-size: 24px;
-  line-height: 30px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.conversation .wic-message-assistant,
+.conversation .wic-tool,
+.conversation .wic-question {
+  max-width: 100%;
+}
+
+.conversation .wic-message-user {
+  max-width: 85%;
 }
 
 .parts {
@@ -209,22 +236,15 @@ pre {
   cursor: not-allowed;
 }
 
-/* New conversation */
-
-.start {
-  justify-content: flex-end;
-}
+/* New conversation: the heading and the composer together, in the middle of the page. */
 
 .start-intro {
-  max-width: 72ch;
-  margin: auto var(--space-4) 0;
+  margin-top: auto;
+  padding: var(--space-8) var(--gutter) 0;
 }
 
-.choices {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 0 var(--space-4);
-  padding: var(--space-4) var(--space-4) 0;
+.start .wic-composer {
+  margin-bottom: auto;
 }
 
 /* Login */
@@ -241,18 +261,198 @@ pre {
   width: min(420px, 100%);
 }
 
-/* Settings */
+/* The mark of a model provider: its logo in the ink of the text, or its initial. */
+
+.provider-logo {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background: currentColor;
+  mask: no-repeat center / contain;
+}
+
+.provider-initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1.5px solid currentColor;
+  font-family: var(--font-gothic);
+  font-weight: 800;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* Settings: the sections in a sidebar, one shown beside it. The dialog keeps its height while the
+   sections change; on a narrow screen the sidebar becomes a row above. */
+
+.wic-dialog-center:has(.settings) {
+  width: min(920px, calc(100vw - 2 * var(--space-4)));
+}
 
 .settings {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: var(--space-8) var(--space-4);
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: var(--space-6);
+  min-height: min(560px, 60dvh);
 }
 
-.settings > * {
-  max-width: 760px;
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-right: var(--space-4);
+  border-right: 1px solid var(--line);
 }
+
+.settings-tab {
+  position: relative;
+  isolation: isolate;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  font-family: var(--font-gothic);
+  font-weight: 700;
+  font-size: 15px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.settings-tab:hover {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+/* The open section is marked by the ochre strip of the open conversation. */
+.settings-tab[aria-current='page'] {
+  color: var(--on-ochre);
+}
+
+.settings-tab[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  inset: 2px 0;
+  z-index: -1;
+  background: var(--ochre);
+  clip-path: polygon(0 10%, 100% 0, 98% 100%, 1% 90%);
+  transform-origin: left;
+  animation: wic-strip var(--motion-paste) var(--ease-paste);
+}
+
+.settings-page {
+  min-width: 0;
+}
+
+.settings-page > .panel {
+  margin-bottom: 0;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-2) var(--space-6);
+  margin: 0 0 var(--space-6);
+}
+
+.facts dt {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--ink-muted);
+}
+
+.facts dd {
+  margin: 0;
+  font-family: var(--font-gothic);
+  font-weight: 700;
+}
+
+.aside-note {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 17px;
+  line-height: 24px;
+  color: var(--ink-muted);
+}
+
+.wizard {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.wizard-step {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink-muted);
+}
+
+.wizard-title {
+  margin: 0;
+  font-family: var(--font-gothic);
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 24px;
+}
+
+.wizard-foot {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.choice {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice:hover .row-name {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+}
+
+.signin {
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (max-width: 720px) {
+  .settings {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 0 0 var(--space-2);
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .settings-tab {
+    white-space: nowrap;
+  }
+}
+
+/* Administration */
 
 .panel {
   margin-bottom: var(--space-12);
@@ -326,32 +526,20 @@ pre {
   margin-bottom: var(--space-4);
 }
 
-@keyframes enter {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .sidebar .wic-conversation-link.enter {
-    animation: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .app {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
+@media (max-width: 560px) {
+  .topbar {
+    flex-wrap: wrap;
   }
 
-  .sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--line);
-    max-height: 35dvh;
+  .topbar-title {
+    order: 3;
+    flex-basis: 100%;
+    justify-content: flex-start;
+  }
+
+  .chat-sheet {
+    --gutter: var(--space-4);
+    width: calc(100% - 2 * var(--space-2));
+    margin: var(--space-2) auto;
   }
 }

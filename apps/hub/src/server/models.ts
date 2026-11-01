@@ -2,11 +2,20 @@
 // pi-ai with the tokens the person connected. The instance tokens (environment variables, files)
 // never serve the people's models.
 
-import type { AuthContext, AuthEvent, AuthPrompt, Models } from '@earendil-works/pi-ai'
+import {
+  type Api,
+  type AuthContext,
+  type AuthEvent,
+  type AuthPrompt,
+  getSupportedThinkingLevels,
+  type Model,
+  type Models,
+} from '@earendil-works/pi-ai'
 import { builtinModels } from '@earendil-works/pi-ai/providers/all'
 import { openResponsesModel } from '@wica/model-compat'
-import { piModel } from '@wica/model-pi'
+import { type ModelUsage, piModel } from '@wica/model-pi'
 import { isLoremModel, LOREM_MODELS, loremModel, type LoremModel } from '@wica/testing/lorem'
+import { REASONING_LEVELS, type ReasoningLevel } from '@wica/core'
 import type { ModelAdapter } from '@wica/runtime'
 
 import type { HubConfig } from './config.ts'
@@ -36,11 +45,47 @@ export function parseModelChoice(value: string | null | undefined): ModelChoice 
   return match ? { kind: 'pi', provider: match[1] as string, model: match[2] as string } : null
 }
 
+/**
+ * A model offered to the person: its `conversations.model` value, its name, the name of its
+ * provider (`group`), the provider's id (`provider`, a pi-ai id for hosted models) and, for a
+ * model with its own identifier, `provider/model` (`slug`).
+ */
+export type ModelOption = {
+  id: string | null
+  name: string
+  group: string
+  provider: string
+  slug?: string
+  /** Reasoning levels the model accepts, weakest first; empty for a model that does not reason. */
+  levels: ReasoningLevel[]
+}
+
+/**
+ * Levels of the instance's model: Open Responses has no way to say which it supports, so every
+ * effort it defines is offered.
+ */
+export const INSTANCE_LEVELS: ReasoningLevel[] = ['off', 'low', 'medium', 'high', 'xhigh']
+
+/** Levels of a pi-ai model, in the vocabulary of the journal. */
+export function piLevels(model: Model<Api>): ReasoningLevel[] {
+  if (!model.reasoning) return []
+  return getSupportedThinkingLevels(model).filter((l): l is ReasoningLevel =>
+    REASONING_LEVELS.includes(l as ReasoningLevel),
+  )
+}
+
+const loremName = (model: LoremModel) =>
+  model === 'lorem' ? 'Lorem ipsum' : 'Lorem ipsum, a tool call each turn'
+
 /** Fake models offered when `WICA_TEST_MODELS` is active. */
-export const testModelOptions = () =>
+export const testModelOptions = (): ModelOption[] =>
   LOREM_MODELS.map((model) => ({
     id: `lorem:${model}`,
-    name: model === 'lorem' ? 'Lorem ipsum (test)' : 'Lorem ipsum, a tool call each turn (test)',
+    name: loremName(model),
+    group: 'Test',
+    provider: 'test',
+    slug: `test/${model}`,
+    levels: [],
   }))
 
 /** No ambient source: neither an environment variable nor a file of the machine. */
@@ -58,11 +103,28 @@ export class NoModelError extends Error {
   override name = 'NoModelError'
 }
 
+/** Name of the chosen model, as the person sees it in the list of models. */
+export function modelName(
+  config: HubConfig,
+  tokens: ModelTokens,
+  owner: string | null,
+  choice: ModelChoice,
+): string {
+  if (choice.kind === 'lorem') return loremName(choice.model)
+  if (choice.kind === 'default') return config.model?.id ?? 'Default model'
+  const found = owner
+    ? userModels(tokens, owner).models.getModel(choice.provider, choice.model)
+    : undefined
+  return found?.name ?? choice.model
+}
+
+/** `onUsage` receives the tokens of each response, when the provider reports them. */
 export function conversationModel(
   config: HubConfig,
   tokens: ModelTokens,
   owner: string | null,
   choice: ModelChoice,
+  onUsage?: (usage: ModelUsage) => void,
 ): ModelAdapter {
   if (choice.kind === 'lorem') {
     if (!config.testModels) throw new NoModelError('Test models are off (WICA_TEST_MODELS).')
@@ -74,6 +136,7 @@ export function conversationModel(
       baseUrl: config.model.url,
       model: config.model.id,
       ...(config.model.apiKey ? { apiKey: config.model.apiKey } : {}),
+      ...(onUsage ? { onUsage } : {}),
     })
   }
   if (!owner) throw new NoModelError('This conversation has no owner, so no model token applies.')
@@ -84,6 +147,7 @@ export function conversationModel(
     model: choice.model,
     // The warning was shown at login; this covers a token connected another way.
     onFirstSubscriptionUse: async (provider) => void (await credentials.markWarned(provider)),
+    ...(onUsage ? { onUsage } : {}),
   })
 }
 

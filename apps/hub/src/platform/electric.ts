@@ -57,6 +57,29 @@ export function shapeSpec(name: SyncTable, scope: SyncScope): ShapeSpec | null {
             columns: ['conversation_id', 'id', 'parent_id', 'seq', 'kind', 'payload', 'status'],
           }
         : null
+    case 'model_calls':
+      return scope.conversationId
+        ? {
+            table: 'model_calls',
+            where: 'conversation_id = $1',
+            params: [scope.conversationId],
+            columns: [
+              'conversation_id',
+              'id',
+              'item_ids',
+              'model',
+              'model_name',
+              'started_at',
+              'first_token_ms',
+              'duration_ms',
+              'input_tokens',
+              'output_tokens',
+              'cache_read_tokens',
+              'cache_write_tokens',
+              'reasoning',
+            ],
+          }
+        : null
     case 'item_chunks':
       return scope.conversationId
         ? {

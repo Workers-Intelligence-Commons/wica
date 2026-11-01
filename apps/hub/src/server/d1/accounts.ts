@@ -187,4 +187,16 @@ export class D1Accounts implements Accounts {
       .where(eq(users.id, userId))
     return user?.name ?? null
   }
+
+  async contributor(userId: string) {
+    const [user] = await this.#db
+      .select({ on: users.contributor })
+      .from(users)
+      .where(eq(users.id, userId))
+    return user?.on ?? false
+  }
+
+  async setContributor(userId: string, on: boolean) {
+    await this.#db.update(users).set({ contributor: on }).where(eq(users.id, userId))
+  }
 }

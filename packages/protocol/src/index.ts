@@ -1,12 +1,12 @@
 // Client protocol: the client reads a resumable stream of items and sends commands, and the
 // server answers.
 
-import type { Item, Part } from '@wica/core'
+import type { Item, Part, ReasoningLevel } from '@wica/core'
 
 export const PROTOCOL_VERSION = 1
 
 export type Command =
-  | { t: 'send'; parentId: string | null; parts: Part[] }
+  | { t: 'send'; parentId: string | null; parts: Part[]; reasoning?: ReasoningLevel }
   | { t: 'answer'; callId: string; value: unknown }
   | { t: 'interrupt' }
   | { t: 'set_head'; itemId: string }

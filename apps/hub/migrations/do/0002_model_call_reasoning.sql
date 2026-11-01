@@ -1,0 +1,1 @@
+ALTER TABLE `model_calls` ADD `reasoning` text;

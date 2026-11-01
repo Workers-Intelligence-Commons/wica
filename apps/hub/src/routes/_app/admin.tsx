@@ -12,6 +12,7 @@ import {
 import { type FormEvent, useCallback, useEffect, useState } from 'react'
 
 import { PASSWORD_LENGTH } from '../../shared/accounts.ts'
+import { TopBar } from '../../ui/TopBar.tsx'
 
 export const Route = createFileRoute('/_app/admin')({
   beforeLoad: ({ context }) => {
@@ -24,10 +25,13 @@ type Account = { id: string; name: string; admin: boolean }
 
 function Admin() {
   return (
-    <section className="settings">
-      <SectionHeading kicker="the instance">Administration</SectionHeading>
-      <Accounts />
-      <Catalog />
+    <section className="page">
+      <TopBar />
+      <div className="page-body">
+        <SectionHeading kicker="the instance">Administration</SectionHeading>
+        <Accounts />
+        <Catalog />
+      </div>
     </section>
   )
 }

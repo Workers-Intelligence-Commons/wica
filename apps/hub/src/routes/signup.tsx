@@ -68,7 +68,7 @@ function SignUp() {
 
   return (
     <main className="login">
-      <Mark name="wic" height={64} label="Workers' Intelligence Commons" />
+      <Mark name="hub" height={64} label="WIC hub" />
       {confirming ? (
         <>
           <SectionHeading kicker="wica">Confirm your address</SectionHeading>

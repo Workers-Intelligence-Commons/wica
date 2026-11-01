@@ -14,6 +14,22 @@ export type Part =
 
 export type Meta = Record<string, unknown>
 
+/**
+ * How much the model reasons before it answers, chosen by the person with each message. Each
+ * adapter maps it to what its provider accepts; `off` asks for no reasoning.
+ */
+export type ReasoningLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+
+export const REASONING_LEVELS: readonly ReasoningLevel[] = [
+  'off',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+]
+
 export type ItemStatus = 'streaming' | 'done' | 'interrupted' | 'failed'
 
 export type EventName =
@@ -32,7 +48,7 @@ export type EventName =
   | 'handed'
 
 export type ItemBody =
-  | { kind: 'user_message'; parts: Part[]; from?: Origin }
+  | { kind: 'user_message'; parts: Part[]; from?: Origin; reasoning?: ReasoningLevel }
   | { kind: 'external_event'; source: string; name: string; data: unknown; trust: Trust }
   | { kind: 'assistant_text'; text: string; audience: 'user' | 'private'; to?: Destination }
   | { kind: 'reasoning'; text?: string; opaque?: { provider: string; data: unknown } }
